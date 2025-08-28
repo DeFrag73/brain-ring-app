@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Брейн-ринг - Екран глядачів</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .main-container {
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .teams-section {
+            margin-bottom: 3rem;
+        }
+
+        .team-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .team-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .team-name {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .team-score {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 0.5rem;
+        }
+
+        .vs-separator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .question-section {
+            margin-top: 3rem;
+        }
+
+        .question-card {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            border: 3px solid #ffd700;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .question-number {
+            font-size: 1.5rem;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .question-text {
+            font-size: 2rem;
+            line-height: 1.4;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .no-game {
+            text-align: center;
+            margin-top: 5rem;
+            opacity: 0.8;
+        }
+
+        .no-game i {
+            font-size: 5rem;
+            margin-bottom: 2rem;
+            opacity: 0.6;
+        }
+
+        .no-game h3 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .waiting-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.6;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .score-animation {
+            animation: scoreChange 0.5s ease-in-out;
+        }
+
+        @keyframes scoreChange {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+                color: #ff6b6b;
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .team-name {
+                font-size: 1.5rem;
+            }
+
+            .team-score {
+                font-size: 3rem;
+            }
+
+            .vs-separator {
+                font-size: 2rem;
+            }
+
+            .question-text {
+                font-size: 1.5rem;
+            }
+
+            .main-container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid main-container">
+        <!-- Заголовок -->
+        <div class="header">
+            <h1><i class="fas fa-brain"></i> БРЕЙН-РИНГ</h1>
+            <p class="lead mb-0">Інтелектуальні змагання</p>
+        </div>
+
+        {% if current_game and current_game.team1_id and current_game.team2_id %}
+            <!-- Секція команд -->
+            <div class="teams-section">
+                <div class="row">
+                    <!-- Перша команда -->
+                    <div class="col-md-5">
+                        <div class="team-card" id="team1-card">
+                            <div class="team-name">{{ team1.name if team1 else 'Команда 1' }}</div>
+                            <div class="team-score" id="team1-score">{{ current_game.team1_score or 0 }}</div>
+                        </div>
+                    </div>
+
+                    <!-- VS сепаратор -->
+                    <div class="col-md-2">
+                        <div class="vs-separator">
+                            <i class="fas fa-bolt waiting-animation"></i>
+                        </div>
+                    </div>
+
+                    <!-- Друга команда -->
+                    <div class="col-md-5">
+                        <div class="team-card" id="team2-card">
+                            <div class="team-name">{{ team2.name if team2 else 'Команда 2' }}</div>
+                            <div class="team-score" id="team2-score">{{ current_game.team2_score or 0 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Секція питання -->
+            {% if current_question and current_game.show_question %}
+            <div class="question-section" id="question-section">
+                <div class="question-card">
+                    <div class="question-number">
+                        <i class="fas fa-question-circle"></i> Питання № {{ current_question.number }}
+                    </div>
+                    <div class="question-text" id="question-text">
+                        {{ current_question.text }}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="question-section" id="waiting-section">
+                <div class="text-center">
+                    <div class="waiting-animation">
+                        <i class="fas fa-hourglass-half fa-3x mb-3" style="opacity: 0.6;"></i>
+                        <h3>Очікування питання...</h3>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        {% else %}
+            <!-- Очікування початку гри -->
+            <div class="no-game">
+                <i class="fas fa-gamepad"></i>
+                <h3>Очікування початку гри</h3>
+                <p class="lead">Адміністратор готує команди для змагання</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- JavaScript для real-time оновлень -->
+    <script>
+        let lastData = null;
+
+        // Функція для оновлення даних
+        async function updateDisplay() {
+            try {
+                const response = await fetch('/api/display-data');
+                const data = await response.json();
+
+                if (JSON.stringify(data) !== JSON.stringify(lastData)) {
+                    updateUI(data);
+                    lastData = data;
+                }
+            } catch (error) {
+                console.error('Помилка при оновленні даних:', error);
+            }
+        }
+
+        // Функція для оновлення UI
+        function updateUI(data) {
+            // Оновлення команд і рахунку
+            if (data.team1 && data.team2) {
+                // Показати секцію команд
+                document.querySelector('.teams-section').style.display = 'block';
+                document.querySelector('.no-game').style.display = 'none';
+
+                // Оновити назви команд
+                const team1Name = document.querySelector('#team1-card .team-name');
+                const team2Name = document.querySelector('#team2-card .team-name');
+                if (team1Name) team1Name.textContent = data.team1;
+                if (team2Name) team2Name.textContent = data.team2;
+
+                // Оновити рахунок з анімацією
+                const team1Score = document.getElementById('team1-score');
+                const team2Score = document.getElementById('team2-score');
+
+                if (team1Score && team1Score.textContent !== data.team1_score.toString()) {
+                    team1Score.textContent = data.team1_score;
+                    team1Score.classList.add('score-animation');
+                    setTimeout(() => team1Score.classList.remove('score-animation'), 500);
+                }
+
+                if (team2Score && team2Score.textContent !== data.team2_score.toString()) {
+                    team2Score.textContent = data.team2_score;
+                    team2Score.classList.add('score-animation');
+                    setTimeout(() => team2Score.classList.remove('score-animation'), 500);
+                }
+            } else {
+                // Сховати секцію команд
+                document.querySelector('.teams-section').style.display = 'none';
+                document.querySelector('.no-game').style.display = 'block';
+            }
+
+            // Оновлення питання
+            const questionSection = document.getElementById('question-section');
+            const waitingSection = document.getElementById('waiting-section');
+
+            if (data.show_question && data.current_question) {
+                // Показати питання
+                if (waitingSection) waitingSection.style.display = 'none';
+
+                if (!questionSection) {
+                    // Створити секцію питання якщо її немає
+                    const newQuestionSection = document.createElement('div');
+                    newQuestionSection.id = 'question-section';
+                    newQuestionSection.className = 'question-section';
+                    newQuestionSection.innerHTML = `
+                        <div class="question-card">
+                            <div class="question-number">
+                                <i class="fas fa-question-circle"></i> Питання № ${data.current_question.number}
+                            </div>
+                            <div class="question-text" id="question-text">
+                                ${data.current_question.text}
+                            </div>
+                        </div>
+                    `;
+                    document.querySelector('.main-container').appendChild(newQuestionSection);
+                } else {
+                    // Оновити існуюче питання
+                    questionSection.style.display = 'block';
+                    const questionNumber = questionSection.querySelector('.question-number');
+                    const questionText = questionSection.querySelector('.question-text');
+
+                    if (questionNumber) {
+                        questionNumber.innerHTML = `<i class="fas fa-question-circle"></i> Питання № ${data.current_question.number}`;
+                    }
+                    if (questionText) {
+                        questionText.textContent = data.current_question.text;
+                    }
+                }
+            } else {
+                // Сховати питання, показати очікування
+                if (questionSection) questionSection.style.display = 'none';
+                if (waitingSection) {
+                    waitingSection.style.display = 'block';
+                } else {
+                    // Створити секцію очікування якщо її немає
+                    const newWaitingSection = document.createElement('div');
+                    newWaitingSection.id = 'waiting-section';
+                    newWaitingSection.className = 'question-section';
+                    newWaitingSection.innerHTML = `
+                        <div class="text-center">
+                            <div class="waiting-animation">
+                                <i class="fas fa-hourglass-half fa-3x mb-3" style="opacity: 0.6;"></i>
+                                <h3>Очікування питання...</h3>
+                            </div>
+                        </div>
+                    `;
+                    document.querySelector('.main-container').appendChild(newWaitingSection);
+                }
+            }
+        }
+
+        // Запуск оновлення кожні 2 секунди
+        setInterval(updateDisplay, 2000);
+
+        // Початкове оновлення
+        updateDisplay();
+
+        // Звукові ефекти (можна розкоментувати якщо потрібно)
+        /*
+        function playScoreSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAkUXrTp66hVFApGn+DyvmE7BjiS2e/AY3EAkI7Gg+K7KOeJG6mI5GqogjKLHDNgYuSPiEqhFJmO5nKqhU2Qe7m0tq2qm4quYgAAAA==');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
+        */
+
+        // Обробка помилок
+        window.addEventListener('error', function(e) {
+            console.error('Помилка JavaScript:', e.error);
+        });
+
+        // Обробка втрати з'єднання
+        window.addEventListener('offline', function() {
+            document.body.style.filter = 'grayscale(100%)';
+            document.body.title = 'Відсутнє з\'єднання з інтернетом';
+        });
+
+        window.addEventListener('online', function() {
+            document.body.style.filter = 'none';
+            document.body.title = '';
+            updateDisplay(); // Негайно оновити після відновлення з'єднання
+        });
+
+        // Автоматичне оновлення сторінки якщо сервер недоступний довго
+        let failedRequests = 0;
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            return originalFetch.apply(this, args)
+                .then(response => {
+                    failedRequests = 0;
+                    return response;
+                })
+                .catch(error => {
+                    failedRequests++;
+                    if (failedRequests >= 5) {
+                        // Перезавантажити сторінку після 5 невдалих запитів
+                        location.reload();
+                    }
+                    throw error;
+                });
+        };
+
+        // Підтримка повноекранного режиму
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F11' || (e.key === 'f' && e.ctrlKey)) {
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log('Не вдалося увійти в повноекранний режим:', err);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+        });
+
+        // Приховання курсору після бездіяльності
+        let mouseTimer;
+        document.addEventListener('mousemove', function() {
+            document.body.style.cursor = 'default';
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                document.body.style.cursor = 'none';
+            }, 3000);
+        });
+
+        console.log('Екран глядачів завантажено. Версія: 1.0');
+    </script>
+</body>
+</html>
