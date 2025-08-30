@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -6,6 +6,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import secrets
+import json
+import asyncio
 import models
 import database
 from database import get_db
@@ -25,6 +27,41 @@ ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "brainring2025"
 
 
+# Список активних WebSocket з'єднань
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        try:
+            await websocket.send_text(message)
+        except:
+            self.disconnect(websocket)
+
+    async def broadcast(self, message: str):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                disconnected.append(connection)
+
+        # Видаляємо недоступні з'єднання
+        for connection in disconnected:
+            self.disconnect(connection)
+
+
+manager = ConnectionManager()
+
+
 def get_current_admin(credentials: HTTPBasicCredentials = Depends(security)):
     """Перевірка авторизації адміністратора"""
     correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
@@ -38,8 +75,67 @@ def get_current_admin(credentials: HTTPBasicCredentials = Depends(security)):
     return credentials.username
 
 
+async def broadcast_display_update(db: Session):
+    """Функція для відправки оновлених даних всім підключеним клієнтам"""
+    current_game = db.query(models.CurrentGame).first()
+
+    data = {
+        "type": "display_update",
+        "team1": None,
+        "team2": None,
+        "team1_score": 0,
+        "team2_score": 0,
+        "current_question": None,
+        "show_question": False
+    }
+
+    if current_game:
+        data["team1_score"] = current_game.team1_score or 0
+        data["team2_score"] = current_game.team2_score or 0
+        data["show_question"] = current_game.show_question or False
+
+        if current_game.team1_id:
+            team1 = db.query(models.Team).filter(models.Team.id == current_game.team1_id).first()
+            data["team1"] = team1.name if team1 else None
+
+        if current_game.team2_id:
+            team2 = db.query(models.Team).filter(models.Team.id == current_game.team2_id).first()
+            data["team2"] = team2.name if team2 else None
+
+        if current_game.current_question_id and current_game.show_question:
+            question = db.query(models.Question).filter(
+                models.Question.id == current_game.current_question_id
+            ).first()
+            data["current_question"] = {
+                "number": question.number,
+                "text": question.text
+            } if question else None
+
+    await manager.broadcast(json.dumps(data))
+
+
 # Створення таблиць в базі даних при запуску
 models.Base.metadata.create_all(bind=database.engine)
+
+
+# ============= WEBSOCKET З'ЄДНАННЯ =============
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Відправляємо початкові дані після підключення
+        db = next(get_db())
+        await broadcast_display_update(db)
+        db.close()
+
+        while True:
+            # Очікуємо повідомлення від клієнта (хоча вони не потрібні для display)
+            data = await websocket.receive_text()
+            # Можна обробляти команди від клієнта, якщо потрібно
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 # ============= МАРШРУТИ ДЛЯ АДМІНІСТРАТОРА =============
@@ -120,6 +216,12 @@ async def edit_question(
     question.text = question_text
     question.notes = notes
     db.commit()
+
+    # Оновлюємо display якщо це поточне питання
+    current_game = db.query(models.CurrentGame).first()
+    if current_game and current_game.current_question_id == question_id:
+        await broadcast_display_update(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -132,6 +234,14 @@ async def delete_question(
     """Видалення питання"""
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if question:
+        # Якщо це поточне питання, приховати його з екрану
+        current_game = db.query(models.CurrentGame).first()
+        if current_game and current_game.current_question_id == question_id:
+            current_game.current_question_id = None
+            current_game.show_question = False
+            db.commit()
+            await broadcast_display_update(db)
+
         db.delete(question)
         db.commit()
     return RedirectResponse("/admin", status_code=303)
@@ -190,15 +300,23 @@ async def delete_team(
 
         # Також оновлюємо current_game, якщо там є посилання на цю команду
         current_game = db.query(models.CurrentGame).first()
+        update_display = False
         if current_game:
             if current_game.team1_id == team_id:
                 current_game.team1_id = None
+                update_display = True
             if current_game.team2_id == team_id:
                 current_game.team2_id = None
+                update_display = True
 
         # Тепер можемо безпечно видалити команду
         db.delete(team)
         db.commit()
+
+        # Оновлюємо display якщо команда була залучена в грі
+        if update_display:
+            await broadcast_display_update(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -222,6 +340,10 @@ async def set_current_teams(
     current_game.team1_score = 0
     current_game.team2_score = 0
     db.commit()
+
+    # Миттєво оновлюємо display
+    await broadcast_display_update(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -237,6 +359,10 @@ async def show_question(
         current_game.current_question_id = question_id
         current_game.show_question = True
         db.commit()
+
+        # Миттєво оновлюємо display
+        await broadcast_display_update(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -250,6 +376,10 @@ async def hide_question(
     if current_game:
         current_game.show_question = False
         db.commit()
+
+        # Миттєво оновлюємо display
+        await broadcast_display_update(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -277,6 +407,9 @@ async def add_score(
             if question:
                 question.is_used = True
                 db.commit()
+
+        # Миттєво оновлюємо display
+        await broadcast_display_update(db)
 
     return RedirectResponse("/admin", status_code=303)
 
@@ -315,6 +448,9 @@ async def finish_round(
         current_game.show_question = False
 
         db.commit()
+
+        # Миттєво оновлюємо display
+        await broadcast_display_update(db)
 
     return RedirectResponse("/admin", status_code=303)
 

@@ -38,6 +38,7 @@
 
         .teams-section {
             margin-bottom: 3rem;
+            display: none; /* Приховано за замовчуванням */
         }
 
         .team-card {
@@ -85,6 +86,7 @@
 
         .question-section {
             margin-top: 3rem;
+            display: none; /* Приховано за замовчуванням */
         }
 
         .question-card {
@@ -133,6 +135,32 @@
             animation: pulse 2s infinite;
         }
 
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.connected {
+            background: rgba(40, 167, 69, 0.8);
+            color: white;
+        }
+
+        .connection-status.connecting {
+            background: rgba(255, 193, 7, 0.8);
+            color: #333;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+        }
+
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -173,6 +201,36 @@
             }
         }
 
+        .slide-in-left {
+            animation: slideInLeft 0.5s ease-out;
+        }
+
+        .slide-in-right {
+            animation: slideInRight 0.5s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
         /* Responsive design */
         @media (max-width: 768px) {
             .header h1 {
@@ -202,6 +260,11 @@
     </style>
 </head>
 <body>
+    <!-- Індикатор стану з'єднання -->
+    <div id="connection-status" class="connection-status connecting">
+        <i class="fas fa-circle-notch fa-spin"></i> Підключення...
+    </div>
+
     <div class="container-fluid main-container">
         <!-- Заголовок -->
         <div class="header">
@@ -209,203 +272,290 @@
             <p class="lead mb-0">Інтелектуальні змагання</p>
         </div>
 
-        {% if current_game and current_game.team1_id and current_game.team2_id %}
-            <!-- Секція команд -->
-            <div class="teams-section">
-                <div class="row">
-                    <!-- Перша команда -->
-                    <div class="col-md-5">
-                        <div class="team-card" id="team1-card">
-                            <div class="team-name">{{ team1.name if team1 else 'Команда 1' }}</div>
-                            <div class="team-score" id="team1-score">{{ current_game.team1_score or 0 }}</div>
-                        </div>
+        <!-- Секція команд -->
+        <div class="teams-section" id="teams-section">
+            <div class="row">
+                <!-- Перша команда -->
+                <div class="col-md-5">
+                    <div class="team-card" id="team1-card">
+                        <div class="team-name" id="team1-name">Команда 1</div>
+                        <div class="team-score" id="team1-score">0</div>
                     </div>
+                </div>
 
-                    <!-- VS сепаратор -->
-                    <div class="col-md-2">
-                        <div class="vs-separator">
-                            <i class="fas fa-bolt waiting-animation"></i>
-                        </div>
+                <!-- VS сепаратор -->
+                <div class="col-md-2">
+                    <div class="vs-separator">
+                        <i class="fas fa-bolt waiting-animation"></i>
                     </div>
+                </div>
 
-                    <!-- Друга команда -->
-                    <div class="col-md-5">
-                        <div class="team-card" id="team2-card">
-                            <div class="team-name">{{ team2.name if team2 else 'Команда 2' }}</div>
-                            <div class="team-score" id="team2-score">{{ current_game.team2_score or 0 }}</div>
-                        </div>
+                <!-- Друга команда -->
+                <div class="col-md-5">
+                    <div class="team-card" id="team2-card">
+                        <div class="team-name" id="team2-name">Команда 2</div>
+                        <div class="team-score" id="team2-score">0</div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Секція питання -->
-            {% if current_question and current_game.show_question %}
-            <div class="question-section" id="question-section">
-                <div class="question-card">
-                    <div class="question-number">
-                        <i class="fas fa-question-circle"></i> Питання № {{ current_question.number }}
-                    </div>
-                    <div class="question-text" id="question-text">
-                        {{ current_question.text }}
-                    </div>
+        <!-- Секція питання -->
+        <div class="question-section" id="question-section">
+            <div class="question-card">
+                <div class="question-number" id="question-number">
+                    <i class="fas fa-question-circle"></i> Питання № 1
+                </div>
+                <div class="question-text" id="question-text">
+                    Очікування питання...
                 </div>
             </div>
-            {% else %}
-            <div class="question-section" id="waiting-section">
-                <div class="text-center">
-                    <div class="waiting-animation">
-                        <i class="fas fa-hourglass-half fa-3x mb-3" style="opacity: 0.6;"></i>
-                        <h3>Очікування питання...</h3>
-                    </div>
+        </div>
+
+        <!-- Секція очікування -->
+        <div id="waiting-section" style="margin-top: 3rem; display: none;">
+            <div class="text-center">
+                <div class="waiting-animation">
+                    <i class="fas fa-hourglass-half fa-3x mb-3" style="opacity: 0.6;"></i>
+                    <h3>Очікування питання...</h3>
                 </div>
             </div>
-            {% endif %}
+        </div>
 
-        {% else %}
-            <!-- Очікування початку гри -->
-            <div class="no-game">
-                <i class="fas fa-gamepad"></i>
-                <h3>Очікування початку гри</h3>
-                <p class="lead">Адміністратор готує команди для змагання</p>
-            </div>
-        {% endif %}
+        <!-- Очікування початку гри -->
+        <div class="no-game" id="no-game">
+            <i class="fas fa-gamepad"></i>
+            <h3>Очікування початку гри</h3>
+            <p class="lead">Адміністратор готує команди для змагання</p>
+        </div>
     </div>
 
-    <!-- JavaScript для real-time оновлень -->
+    <!-- JavaScript для WebSocket з'єднання -->
     <script>
-        let lastData = null;
+        let socket;
+        let reconnectInterval;
+        let isReconnecting = false;
 
-        // Функція для оновлення даних
-        async function updateDisplay() {
+        // Елементи DOM
+        const connectionStatus = document.getElementById('connection-status');
+        const teamsSection = document.getElementById('teams-section');
+        const questionSection = document.getElementById('question-section');
+        const waitingSection = document.getElementById('waiting-section');
+        const noGameSection = document.getElementById('no-game');
+
+        // Елементи команд
+        const team1Name = document.getElementById('team1-name');
+        const team1Score = document.getElementById('team1-score');
+        const team2Name = document.getElementById('team2-name');
+        const team2Score = document.getElementById('team2-score');
+        const team1Card = document.getElementById('team1-card');
+        const team2Card = document.getElementById('team2-card');
+
+        // Елементи питання
+        const questionNumber = document.getElementById('question-number');
+        const questionText = document.getElementById('question-text');
+
+        // Функція підключення до WebSocket
+        function connectWebSocket() {
             try {
-                const response = await fetch('/api/display-data');
-                const data = await response.json();
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+                socket = new WebSocket(wsUrl);
 
-                if (JSON.stringify(data) !== JSON.stringify(lastData)) {
-                    updateUI(data);
-                    lastData = data;
-                }
+                socket.onopen = function(event) {
+                    console.log('WebSocket з\'єднання встановлено');
+                    updateConnectionStatus('connected');
+                    isReconnecting = false;
+
+                    if (reconnectInterval) {
+                        clearInterval(reconnectInterval);
+                        reconnectInterval = null;
+                    }
+                };
+
+                socket.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'display_update') {
+                            updateDisplay(data);
+                        }
+                    } catch (error) {
+                        console.error('Помилка обробки повідомлення:', error);
+                    }
+                };
+
+                socket.onclose = function(event) {
+                    console.log('WebSocket з\'єднання закрито:', event.code, event.reason);
+                    updateConnectionStatus('disconnected');
+
+                    if (!isReconnecting) {
+                        attemptReconnect();
+                    }
+                };
+
+                socket.onerror = function(error) {
+                    console.error('Помилка WebSocket:', error);
+                    updateConnectionStatus('disconnected');
+                };
+
             } catch (error) {
-                console.error('Помилка при оновленні даних:', error);
+                console.error('Помилка створення WebSocket:', error);
+                updateConnectionStatus('disconnected');
+                attemptReconnect();
             }
         }
 
-        // Функція для оновлення UI
-        function updateUI(data) {
+        // Функція спроби перепідключення
+        function attemptReconnect() {
+            if (isReconnecting) return;
+
+            isReconnecting = true;
+            updateConnectionStatus('connecting');
+
+            reconnectInterval = setInterval(function() {
+                console.log('Спроба перепідключення...');
+                connectWebSocket();
+            }, 3000);
+        }
+
+        // Оновлення статусу з'єднання
+        function updateConnectionStatus(status) {
+            connectionStatus.className = `connection-status ${status}`;
+
+            switch(status) {
+                case 'connected':
+                    connectionStatus.innerHTML = '<i class="fas fa-wifi"></i> Підключено';
+                    break;
+                case 'connecting':
+                    connectionStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Підключення...';
+                    break;
+                case 'disconnected':
+                    connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Відключено';
+                    break;
+            }
+        }
+
+        // Головна функція оновлення UI
+        function updateDisplay(data) {
+            console.log('Оновлення display:', data);
+
             // Оновлення команд і рахунку
             if (data.team1 && data.team2) {
-                // Показати секцію команд
-                document.querySelector('.teams-section').style.display = 'block';
-                document.querySelector('.no-game').style.display = 'none';
-
-                // Оновити назви команд
-                const team1Name = document.querySelector('#team1-card .team-name');
-                const team2Name = document.querySelector('#team2-card .team-name');
-                if (team1Name) team1Name.textContent = data.team1;
-                if (team2Name) team2Name.textContent = data.team2;
-
-                // Оновити рахунок з анімацією
-                const team1Score = document.getElementById('team1-score');
-                const team2Score = document.getElementById('team2-score');
-
-                if (team1Score && team1Score.textContent !== data.team1_score.toString()) {
-                    team1Score.textContent = data.team1_score;
-                    team1Score.classList.add('score-animation');
-                    setTimeout(() => team1Score.classList.remove('score-animation'), 500);
-                }
-
-                if (team2Score && team2Score.textContent !== data.team2_score.toString()) {
-                    team2Score.textContent = data.team2_score;
-                    team2Score.classList.add('score-animation');
-                    setTimeout(() => team2Score.classList.remove('score-animation'), 500);
-                }
+                showTeamsSection();
+                updateTeams(data);
             } else {
-                // Сховати секцію команд
-                document.querySelector('.teams-section').style.display = 'none';
-                document.querySelector('.no-game').style.display = 'block';
+                showNoGameSection();
             }
 
             // Оновлення питання
-            const questionSection = document.getElementById('question-section');
-            const waitingSection = document.getElementById('waiting-section');
-
             if (data.show_question && data.current_question) {
-                // Показати питання
-                if (waitingSection) waitingSection.style.display = 'none';
-
-                if (!questionSection) {
-                    // Створити секцію питання якщо її немає
-                    const newQuestionSection = document.createElement('div');
-                    newQuestionSection.id = 'question-section';
-                    newQuestionSection.className = 'question-section';
-                    newQuestionSection.innerHTML = `
-                        <div class="question-card">
-                            <div class="question-number">
-                                <i class="fas fa-question-circle"></i> Питання № ${data.current_question.number}
-                            </div>
-                            <div class="question-text" id="question-text">
-                                ${data.current_question.text}
-                            </div>
-                        </div>
-                    `;
-                    document.querySelector('.main-container').appendChild(newQuestionSection);
-                } else {
-                    // Оновити існуюче питання
-                    questionSection.style.display = 'block';
-                    const questionNumber = questionSection.querySelector('.question-number');
-                    const questionText = questionSection.querySelector('.question-text');
-
-                    if (questionNumber) {
-                        questionNumber.innerHTML = `<i class="fas fa-question-circle"></i> Питання № ${data.current_question.number}`;
-                    }
-                    if (questionText) {
-                        questionText.textContent = data.current_question.text;
-                    }
-                }
-            } else {
-                // Сховати питання, показати очікування
-                if (questionSection) questionSection.style.display = 'none';
-                if (waitingSection) {
-                    waitingSection.style.display = 'block';
-                } else {
-                    // Створити секцію очікування якщо її немає
-                    const newWaitingSection = document.createElement('div');
-                    newWaitingSection.id = 'waiting-section';
-                    newWaitingSection.className = 'question-section';
-                    newWaitingSection.innerHTML = `
-                        <div class="text-center">
-                            <div class="waiting-animation">
-                                <i class="fas fa-hourglass-half fa-3x mb-3" style="opacity: 0.6;"></i>
-                                <h3>Очікування питання...</h3>
-                            </div>
-                        </div>
-                    `;
-                    document.querySelector('.main-container').appendChild(newWaitingSection);
-                }
+                showQuestion(data.current_question);
+            } else if (data.team1 && data.team2) {
+                showWaitingForQuestion();
             }
         }
 
-        // Запуск оновлення кожні 2 секунди
-        setInterval(updateDisplay, 2000);
-
-        // Початкове оновлення
-        updateDisplay();
-
-        // Звукові ефекти (можна розкоментувати якщо потрібно)
-        /*
-        function playScoreSound() {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAkUXrTp66hVFApGn+DyvmE7BjiS2e/AY3EAkI7Gg+K7KOeJG6mI5GqogjKLHDNgYuSPiEqhFJmO5nKqhU2Qe7m0tq2qm4quYgAAAA==');
-            audio.play().catch(e => console.log('Audio play failed:', e));
+        // Показати секцію команд
+        function showTeamsSection() {
+            teamsSection.style.display = 'block';
+            noGameSection.style.display = 'none';
         }
-        */
 
-        // Обробка помилок
-        window.addEventListener('error', function(e) {
-            console.error('Помилка JavaScript:', e.error);
+        // Показати секцію "немає гри"
+        function showNoGameSection() {
+            teamsSection.style.display = 'none';
+            questionSection.style.display = 'none';
+            waitingSection.style.display = 'none';
+            noGameSection.style.display = 'block';
+        }
+
+        // Оновити команди та рахунок
+        function updateTeams(data) {
+            // Оновлення назв команд з анімацією
+            if (team1Name.textContent !== data.team1) {
+                team1Name.textContent = data.team1;
+                team1Card.classList.add('slide-in-left');
+                setTimeout(() => team1Card.classList.remove('slide-in-left'), 500);
+            }
+
+            if (team2Name.textContent !== data.team2) {
+                team2Name.textContent = data.team2;
+                team2Card.classList.add('slide-in-right');
+                setTimeout(() => team2Card.classList.remove('slide-in-right'), 500);
+            }
+
+            // Оновлення рахунку з анімацією
+            if (team1Score.textContent !== data.team1_score.toString()) {
+                team1Score.textContent = data.team1_score;
+                team1Score.classList.add('score-animation');
+                setTimeout(() => team1Score.classList.remove('score-animation'), 500);
+                playScoreSound();
+            }
+
+            if (team2Score.textContent !== data.team2_score.toString()) {
+                team2Score.textContent = data.team2_score;
+                team2Score.classList.add('score-animation');
+                setTimeout(() => team2Score.classList.remove('score-animation'), 500);
+                playScoreSound();
+            }
+        }
+
+        // Показати питання
+        function showQuestion(question) {
+            questionSection.style.display = 'block';
+            waitingSection.style.display = 'none';
+
+            questionNumber.innerHTML = `<i class="fas fa-question-circle"></i> Питання № ${question.number}`;
+            questionText.textContent = question.text;
+
+            // Анімація появи питання
+            const questionCard = questionSection.querySelector('.question-card');
+            questionCard.style.animation = 'none';
+            setTimeout(() => {
+                questionCard.style.animation = 'fadeInUp 0.6s ease-out';
+            }, 10);
+        }
+
+        // Показати очікування питання
+        function showWaitingForQuestion() {
+            questionSection.style.display = 'none';
+            waitingSection.style.display = 'block';
+        }
+
+        // Звукові ефекти
+        function playScoreSound() {
+            try {
+                // Створення простого звукового сигналу
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (error) {
+                console.log('Звук недоступний:', error);
+            }
+        }
+
+        // Ініціалізація при завантаженні сторінки
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Ініціалізація WebSocket з\'єднання...');
+            connectWebSocket();
         });
 
-        // Обробка втрати з'єднання
+        // Обробка втрати з'єднання з інтернетом
         window.addEventListener('offline', function() {
+            updateConnectionStatus('disconnected');
             document.body.style.filter = 'grayscale(100%)';
             document.body.title = 'Відсутнє з\'єднання з інтернетом';
         });
@@ -413,27 +563,10 @@
         window.addEventListener('online', function() {
             document.body.style.filter = 'none';
             document.body.title = '';
-            updateDisplay(); // Негайно оновити після відновлення з'єднання
+            if (socket.readyState !== WebSocket.OPEN) {
+                attemptReconnect();
+            }
         });
-
-        // Автоматичне оновлення сторінки якщо сервер недоступний довго
-        let failedRequests = 0;
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-            return originalFetch.apply(this, args)
-                .then(response => {
-                    failedRequests = 0;
-                    return response;
-                })
-                .catch(error => {
-                    failedRequests++;
-                    if (failedRequests >= 5) {
-                        // Перезавантажити сторінку після 5 невдалих запитів
-                        location.reload();
-                    }
-                    throw error;
-                });
-        };
 
         // Підтримка повноекранного режиму
         document.addEventListener('keydown', function(e) {
@@ -459,7 +592,19 @@
             }, 3000);
         });
 
-        console.log('Екран глядачів завантажено. Версія: 1.0');
+        // Обробка помилок
+        window.addEventListener('error', function(e) {
+            console.error('Помилка JavaScript:', e.error);
+        });
+
+        // Закриття з'єднання при закритті сторінки
+        window.addEventListener('beforeunload', function() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+        });
+
+        console.log('Екран глядачів завантажено з WebSocket підтримкою. Версія: 2.0');
     </script>
 </body>
 </html>
