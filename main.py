@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, UploadFile, \
+    File
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -10,7 +11,11 @@ import json
 import asyncio
 import models
 import database
+import csv
+import io
 from database import get_db
+from sqlalchemy import func
+from models import DifficultyLevel
 
 # Створення FastAPI додатку
 app = FastAPI(title="Брейн-ринг", description="Додаток для проведення ігор Брейн-ринг")
@@ -141,10 +146,41 @@ async def websocket_endpoint(websocket: WebSocket):
 # ============= МАРШРУТИ ДЛЯ АДМІНІСТРАТОРА =============
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_panel(request: Request, admin: str = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Головна сторінка адміністратора"""
-    # Отримуємо всі дані для відображення
-    questions = db.query(models.Question).all()
+async def admin_panel(
+        request: Request,
+        sort_by: str = "number",  # Параметр сортування
+        sort_order: str = "asc",  # Порядок сортування
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Головна сторінка адміністратора з сортуванням"""
+
+    # Базовий запит для питань
+    questions_query = db.query(models.Question)
+
+    # Застосовуємо сортування
+    if sort_by == "text":
+        if sort_order == "desc":
+            questions_query = questions_query.order_by(models.Question.text.desc())
+        else:
+            questions_query = questions_query.order_by(models.Question.text.asc())
+    elif sort_by == "difficulty":
+        if sort_order == "desc":
+            questions_query = questions_query.order_by(models.Question.difficulty.desc())
+        else:
+            questions_query = questions_query.order_by(models.Question.difficulty.asc())
+    elif sort_by == "created_at":
+        if sort_order == "desc":
+            questions_query = questions_query.order_by(models.Question.created_at.desc())
+        else:
+            questions_query = questions_query.order_by(models.Question.created_at.asc())
+    else:  # sort_by == "number" або будь-що інше
+        if sort_order == "desc":
+            questions_query = questions_query.order_by(models.Question.number.desc())
+        else:
+            questions_query = questions_query.order_by(models.Question.number.asc())
+
+    questions = questions_query.all()
     teams = db.query(models.Team).all()
     current_game = db.query(models.CurrentGame).first()
 
@@ -168,35 +204,108 @@ async def admin_panel(request: Request, admin: str = Depends(get_current_admin),
             'games_played': total_score
         })
 
+    # Статистика по складності питань
+    difficulty_stats = {}
+    for difficulty in DifficultyLevel:
+        count = db.query(models.Question).filter(models.Question.difficulty == difficulty).count()
+        used_count = db.query(models.Question).filter(
+            models.Question.difficulty == difficulty,
+            models.Question.is_used == True
+        ).count()
+        difficulty_stats[difficulty.value] = {
+            'total': count,
+            'used': used_count,
+            'available': count - used_count,
+            'display_name': DifficultyLevel.get_display_name(difficulty),
+            'color_class': DifficultyLevel.get_color_class(difficulty)
+        }
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "questions": questions,
         "teams": teams,
         "current_game": current_game,
-        "team_stats": team_stats
+        "team_stats": team_stats,
+        "difficulty_stats": difficulty_stats,
+        "difficulty_levels": [(level.value, DifficultyLevel.get_display_name(level)) for level in DifficultyLevel],
+        "current_sort": {"by": sort_by, "order": sort_order}
     })
 
 
 # ============= API для управління питаннями =============
 
+@app.post("/admin/questions/renumber")
+async def renumber_questions_endpoint(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Ендпойнт для ручної перенумерації питань"""
+    renumber_questions(db)
+    return JSONResponse({"status": "success", "message": "Питання перенумеровано"})
+
+
+# API ендпойнт для отримання статистики по складності
+@app.get("/api/difficulty-stats")
+async def get_difficulty_stats(db: Session = Depends(get_db)):
+    """API для отримання статистики по рівням складності"""
+    stats = {}
+    for difficulty in DifficultyLevel:
+        total = db.query(models.Question).filter(models.Question.difficulty == difficulty).count()
+        used = db.query(models.Question).filter(
+            models.Question.difficulty == difficulty,
+            models.Question.is_used == True
+        ).count()
+
+        stats[difficulty.value] = {
+            'display_name': DifficultyLevel.get_display_name(difficulty),
+            'color_class': DifficultyLevel.get_color_class(difficulty),
+            'total': total,
+            'used': used,
+            'available': total - used
+        }
+
+    return JSONResponse(stats)
+
+# Функція для перенумерації питань
+def renumber_questions(db: Session):
+    """Перенумерація всіх питань за порядком створення"""
+    questions = db.query(models.Question).order_by(models.Question.created_at).all()
+    for idx, question in enumerate(questions, 1):
+        question.number = idx
+    db.commit()
+
+
+# Оновлена функція додавання питання
 @app.post("/admin/questions/add")
 async def add_question(
         question_text: str = Form(...),
         notes: str = Form(""),
+        difficulty: str = Form("medium"),  # Додаємо параметр складності
         admin: str = Depends(get_current_admin),
         db: Session = Depends(get_db)
 ):
     """Додавання нового питання"""
+    # Конвертуємо строку в enum
+    try:
+        difficulty_enum = DifficultyLevel(difficulty)
+    except ValueError:
+        difficulty_enum = DifficultyLevel.MEDIUM
+
     # Знаходимо максимальний номер питання
     max_number = db.query(models.Question).count()
 
     question = models.Question(
         number=max_number + 1,
         text=question_text,
-        notes=notes
+        notes=notes,
+        difficulty=difficulty_enum
     )
     db.add(question)
     db.commit()
+
+    # Перенумеровуємо всі питання
+    renumber_questions(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -205,6 +314,7 @@ async def edit_question(
         question_id: int,
         question_text: str = Form(...),
         notes: str = Form(""),
+        difficulty: str = Form("medium"),  # Додаємо параметр складності
         admin: str = Depends(get_current_admin),
         db: Session = Depends(get_db)
 ):
@@ -213,8 +323,15 @@ async def edit_question(
     if not question:
         raise HTTPException(status_code=404, detail="Питання не знайдено")
 
+    # Конвертуємо строку в enum
+    try:
+        difficulty_enum = DifficultyLevel(difficulty)
+    except ValueError:
+        difficulty_enum = DifficultyLevel.MEDIUM
+
     question.text = question_text
     question.notes = notes
+    question.difficulty = difficulty_enum
     db.commit()
 
     # Оновлюємо display якщо це поточне питання
@@ -244,6 +361,10 @@ async def delete_question(
 
         db.delete(question)
         db.commit()
+
+        # Перенумеровуємо всі питання після видалення
+        renumber_questions(db)
+
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -526,6 +647,323 @@ async def get_display_data(db: Session = Depends(get_db)):
 
     return JSONResponse(data)
 
+
+# API ендпойнт для скидання статусу всіх питань
+@app.post("/api/questions/reset-all")
+async def reset_all_questions(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Скидання статусу всіх питань"""
+    db.query(models.Question).update({"is_used": False})
+    db.commit()
+    return JSONResponse({"status": "success", "message": "Статус всіх питань скинуто"})
+
+
+# API ендпойнт для експорту питань в CSV
+@app.get("/api/questions/export")
+async def export_questions(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Експорт питань у форматі CSV"""
+    questions = db.query(models.Question).order_by(models.Question.number).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Заголовки
+    writer.writerow(['Номер', 'Текст питання', 'Складність', 'Нотатки', 'Використано', 'Дата створення'])
+
+    # Дані
+    for question in questions:
+        writer.writerow([
+            question.number,
+            question.text,
+            question.difficulty_display,
+            question.notes or '',
+            'Так' if question.is_used else 'Ні',
+            question.created_at.strftime('%Y-%m-%d %H:%M') if question.created_at else ''
+        ])
+
+    output.seek(0)
+
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=brainring_questions.csv"}
+    )
+
+
+# API ендпойнт для імпорту питань з CSV
+@app.post("/api/questions/import")
+async def import_questions(
+        file: UploadFile = File(...),
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Імпорт питань з CSV файлу"""
+    try:
+        # Читаємо файл
+        content = await file.read()
+        csv_content = content.decode('utf-8')
+
+        # Парсимо CSV
+        reader = csv.DictReader(io.StringIO(csv_content))
+        added_count = 0
+        errors = []
+
+        for row_num, row in enumerate(reader, 1):
+            try:
+                text = row.get('Текст питання') or row.get('text', '').strip()
+                difficulty_str = row.get('Складність') or row.get('difficulty', 'medium')
+                notes = row.get('Нотатки') or row.get('notes', '')
+
+                if not text:
+                    continue
+
+                # Конвертуємо українську назву складності в enum
+                difficulty_mapping = {
+                    'Дуже легке': 'very_easy',
+                    'Легке': 'easy',
+                    'Середнє': 'medium',
+                    'Складне': 'hard',
+                    'Дуже складне': 'very_hard'
+                }
+
+                difficulty_value = difficulty_mapping.get(difficulty_str, difficulty_str.lower())
+
+                try:
+                    difficulty_enum = models.DifficultyLevel(difficulty_value)
+                except ValueError:
+                    difficulty_enum = models.DifficultyLevel.MEDIUM
+
+                # Створюємо питання
+                max_number = db.query(models.Question).count()
+                question = models.Question(
+                    number=max_number + 1,
+                    text=text,
+                    notes=notes,
+                    difficulty=difficulty_enum
+                )
+                db.add(question)
+                added_count += 1
+
+            except Exception as e:
+                errors.append(f"Рядок {row_num}: {str(e)}")
+
+        if added_count > 0:
+            db.commit()
+            renumber_questions(db)
+
+        return JSONResponse({
+            "status": "success" if added_count > 0 else "warning",
+            "message": f"Імпортовано {added_count} питань",
+            "errors": errors
+        })
+
+    except Exception as e:
+        return JSONResponse({
+            "status": "error",
+            "message": f"Помилка імпорту: {str(e)}"
+        }, status_code=400)
+
+
+# API ендпойнт для пакетного оновлення статусу питань
+@app.post("/api/questions/bulk-update-status")
+async def bulk_update_question_status(
+        question_ids: List[int] = Form(...),
+        mark_as_used: bool = Form(...),
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Пакетне оновлення статусу питань"""
+    updated = db.query(models.Question).filter(
+        models.Question.id.in_(question_ids)
+    ).update({"is_used": mark_as_used}, synchronize_session=False)
+
+    db.commit()
+
+    return JSONResponse({
+        "status": "success",
+        "message": f"Оновлено статус {updated} питань"
+    })
+
+
+# API ендпойнт для отримання питань за складністю
+@app.get("/api/questions/by-difficulty/{difficulty}")
+async def get_questions_by_difficulty(
+        difficulty: str,
+        include_used: bool = False,
+        db: Session = Depends(get_db)
+):
+    """Отримання питань за рівнем складності"""
+    try:
+        difficulty_enum = models.DifficultyLevel(difficulty)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Невірний рівень складності")
+
+    query = db.query(models.Question).filter(models.Question.difficulty == difficulty_enum)
+
+    if not include_used:
+        query = query.filter(models.Question.is_used == False)
+
+    questions = query.order_by(models.Question.number).all()
+
+    return JSONResponse({
+        "difficulty": models.DifficultyLevel.get_display_name(difficulty_enum),
+        "total": len(questions),
+        "questions": [
+            {
+                "id": q.id,
+                "number": q.number,
+                "text": q.text[:100] + "..." if len(q.text) > 100 else q.text,
+                "is_used": q.is_used,
+                "notes": q.notes
+            }
+            for q in questions
+        ]
+    })
+
+
+# API ендпойнт для отримання статистики використання питань
+@app.get("/api/questions/usage-stats")
+async def get_question_usage_stats(db: Session = Depends(get_db)):
+    """Детальна статистика використання питань"""
+    stats = {}
+
+    for difficulty in models.DifficultyLevel:
+        total = db.query(models.Question).filter(
+            models.Question.difficulty == difficulty
+        ).count()
+
+        used = db.query(models.Question).filter(
+            models.Question.difficulty == difficulty,
+            models.Question.is_used == True
+        ).count()
+
+        stats[difficulty.value] = {
+            "display_name": models.DifficultyLevel.get_display_name(difficulty),
+            "color_class": models.DifficultyLevel.get_color_class(difficulty),
+            "total": total,
+            "used": used,
+            "available": total - used,
+            "usage_percentage": round((used / total * 100) if total > 0 else 0, 1)
+        }
+
+    # Загальна статистика
+    total_questions = db.query(models.Question).count()
+    used_questions = db.query(models.Question).filter(models.Question.is_used == True).count()
+
+    return JSONResponse({
+        "by_difficulty": stats,
+        "overall": {
+            "total": total_questions,
+            "used": used_questions,
+            "available": total_questions - used_questions,
+            "usage_percentage": round((used_questions / total_questions * 100) if total_questions > 0 else 0, 1)
+        }
+    })
+
+
+# API ендпойнт для отримання рекомендацій питань
+@app.get("/api/questions/recommendations")
+async def get_question_recommendations(
+        difficulty: Optional[str] = None,
+        exclude_used: bool = True,
+        limit: int = 10,
+        db: Session = Depends(get_db)
+):
+    """Отримання рекомендованих питань для гри"""
+    query = db.query(models.Question)
+
+    if exclude_used:
+        query = query.filter(models.Question.is_used == False)
+
+    if difficulty:
+        try:
+            difficulty_enum = models.DifficultyLevel(difficulty)
+            query = query.filter(models.Question.difficulty == difficulty_enum)
+        except ValueError:
+            pass
+
+    # Сортуємо по створенню і беремо випадкові
+    questions = query.order_by(func.random()).limit(limit).all()
+
+    return JSONResponse({
+        "questions": [
+            {
+                "id": q.id,
+                "number": q.number,
+                "text": q.text,
+                "difficulty": q.difficulty_display,
+                "difficulty_color": q.difficulty_color,
+                "notes": q.notes,
+                "is_used": q.is_used
+            }
+            for q in questions
+        ],
+        "total_found": len(questions)
+    })
+
+
+# API ендпойнт для пошуку питань
+@app.get("/api/questions/search")
+async def search_questions(
+        q: str = "",
+        difficulty: Optional[str] = None,
+        used_status: Optional[str] = None,
+        limit: int = 50,
+        db: Session = Depends(get_db)
+):
+    """Пошук питань за різними критеріями"""
+    query = db.query(models.Question)
+
+    # Пошук за текстом
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (models.Question.text.like(search_term)) |
+            (models.Question.notes.like(search_term))
+        )
+
+    # Фільтр за складністю
+    if difficulty:
+        try:
+            difficulty_enum = models.DifficultyLevel(difficulty)
+            query = query.filter(models.Question.difficulty == difficulty_enum)
+        except ValueError:
+            pass
+
+    # Фільтр за статусом використання
+    if used_status == "used":
+        query = query.filter(models.Question.is_used == True)
+    elif used_status == "available":
+        query = query.filter(models.Question.is_used == False)
+
+    questions = query.order_by(models.Question.number).limit(limit).all()
+
+    return JSONResponse({
+        "questions": [
+            {
+                "id": q.id,
+                "number": q.number,
+                "text": q.text[:150] + "..." if len(q.text) > 150 else q.text,
+                "difficulty": q.difficulty_display,
+                "difficulty_color": q.difficulty_color,
+                "notes": q.notes,
+                "is_used": q.is_used,
+                "created_at": q.created_at.isoformat() if q.created_at else None
+            }
+            for q in questions
+        ],
+        "total_found": len(questions),
+        "search_query": q,
+        "filters": {
+            "difficulty": difficulty,
+            "used_status": used_status
+        }
+    })
 
 # ============= ГОЛОВНА СТОРІНКА =============
 

@@ -1,10 +1,56 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime, ForeignKey, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import enum
 
 # Базовий клас для всіх моделей
 Base = declarative_base()
+
+
+# Enum для рівнів складності питань
+class DifficultyLevel(enum.Enum):
+    VERY_HARD = "very_hard"
+    HARD = "hard"
+    MEDIUM = "medium"
+    EASY = "easy"
+    VERY_EASY = "very_easy"
+
+    @classmethod
+    def get_display_name(cls, value):
+        """Повертає читабельну назву рівня складності українською"""
+        display_names = {
+            cls.VERY_HARD: "Дуже складне",
+            cls.HARD: "Складне",
+            cls.MEDIUM: "Середнє",
+            cls.EASY: "Легке",
+            cls.VERY_EASY: "Дуже легке"
+        }
+        return display_names.get(value, "Невідомо")
+
+    @classmethod
+    def get_color_class(cls, value):
+        """Повертає CSS клас для кольору відповідно до складності"""
+        color_classes = {
+            cls.VERY_HARD: "danger",
+            cls.HARD: "warning",
+            cls.MEDIUM: "info",
+            cls.EASY: "success",
+            cls.VERY_EASY: "secondary"
+        }
+        return color_classes.get(value, "primary")
+
+    @classmethod
+    def get_sort_order(cls, value):
+        """Повертає числовий порядок для сортування (від найскладніших до найлегших)"""
+        sort_orders = {
+            cls.VERY_HARD: 1,
+            cls.HARD: 2,
+            cls.MEDIUM: 3,
+            cls.EASY: 4,
+            cls.VERY_EASY: 5
+        }
+        return sort_orders.get(value, 999)
 
 
 class Question(Base):
@@ -12,11 +58,27 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    number = Column(Integer, nullable=False)  # Номер питання
+    number = Column(Integer, nullable=False)  # Номер питання (автоматично оновлюється)
     text = Column(Text, nullable=False)  # Текст питання
     notes = Column(Text, default="")  # Нотатки адміністратора
+    difficulty = Column(Enum(DifficultyLevel), default=DifficultyLevel.MEDIUM)  # Рівень складності
     is_used = Column(Boolean, default=False)  # Чи було використане питання
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    @property
+    def difficulty_display(self):
+        """Повертає читабельну назву складності"""
+        return DifficultyLevel.get_display_name(self.difficulty)
+
+    @property
+    def difficulty_color(self):
+        """Повертає CSS клас для кольору складності"""
+        return DifficultyLevel.get_color_class(self.difficulty)
+
+    @property
+    def difficulty_sort_order(self):
+        """Повертає порядок для сортування за складністю"""
+        return DifficultyLevel.get_sort_order(self.difficulty)
 
 
 class Team(Base):

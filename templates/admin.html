@@ -69,8 +69,35 @@
                 </div>
 
                 <!-- Секція Питання -->
+                <!-- Секція Питання з додатковим функціоналом -->
                 <div id="questions-section" class="content-section">
                     <h3><i class="fas fa-question-circle"></i> Управління питаннями</h3>
+
+                    <!-- Статистика по складності -->
+                    {% if difficulty_stats %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="fas fa-chart-pie"></i> Статистика за складністю</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for difficulty_key, stats in difficulty_stats.items() %}
+                                <div class="col-md-2 col-sm-4 col-6 mb-2">
+                                    <div class="text-center">
+                                        <div class="badge bg-{{ stats.color_class }} d-block py-2 mb-1">
+                                            {{ stats.display_name }}
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ stats.available }}/{{ stats.total }}
+                                            <br>доступно
+                                        </small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <!-- Форма додавання питання -->
                     <div class="card mb-4">
@@ -80,65 +107,248 @@
                         <div class="card-body">
                             <form method="post" action="/admin/questions/add">
                                 <div class="row">
-                                    <div class="col-md-8">
+                                    <div class="col-md-7">
                                         <div class="mb-3">
                                             <label for="question_text" class="form-label">Текст питання</label>
                                             <textarea class="form-control" id="question_text" name="question_text"
                                                     rows="3" placeholder="Введіть текст питання..." required></textarea>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label for="difficulty" class="form-label">Складність</label>
+                                            <select class="form-select" id="difficulty" name="difficulty" required>
+                                                {% for value, display_name in difficulty_levels %}
+                                                    <option value="{{ value }}" {% if value == 'medium' %}selected{% endif %}>
+                                                        {{ display_name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                         <div class="mb-3">
                                             <label for="notes" class="form-label">Нотатки</label>
                                             <textarea class="form-control" id="notes" name="notes"
-                                                    rows="3" placeholder="Складність, категорія..."></textarea>
+                                                    rows="2" placeholder="Категорія, джерело..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <div>
+                                            <button type="submit" class="btn btn-primary d-block w-100 mb-2">
+                                                <i class="fas fa-plus"></i> Додати
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary d-block w-100"
+                                                    onclick="QuestionManager.importQuestions()" title="Імпорт з файлу">
+                                                <i class="fas fa-file-import"></i> Імпорт
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-plus"></i> Додати питання
-                                </button>
                             </form>
                         </div>
                     </div>
+
+                    <!-- Панель фільтрів та пошуку для секції питань -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="fas fa-filter"></i> Фільтри та пошук</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-end">
+                                <div class="col-md-4">
+                                    <label for="search-questions" class="form-label">Пошук в питаннях</label>
+                                    <div class="input-group">
+                                        <input type="text" id="search-questions" class="form-control filter-input"
+                                               placeholder="Введіть текст для пошуку...">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="performQuestionSearch()">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="filter-difficulty" class="form-label">Складність</label>
+                                    <select id="filter-difficulty" class="form-select filter-select" onchange="QuestionFilter.filterByDifficulty(this.value)">
+                                        <option value="all">Всі рівні</option>
+                                        {% for value, display_name in difficulty_levels %}
+                                            <option value="{{ display_name.lower() }}">{{ display_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="filter-status" class="form-label">Статус</label>
+                                    <select id="filter-status" class="form-select filter-select" onchange="QuestionFilter.filterByStatus(this.value)">
+                                        <option value="all">Всі питання</option>
+                                        <option value="available">Доступні</option>
+                                        <option value="used">Використані</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="btn-group w-100" role="group">
+                                        <button type="button" class="btn btn-outline-primary" onclick="QuestionFilter.clearFilters()">
+                                            <i class="fas fa-times"></i> Очистити фільтри
+                                        </button>
+                                        <button type="button" class="btn btn-outline-info dropdown-toggle"
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-magic"></i> Швидкі дії
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><h6 class="dropdown-header">Позначити як використані</h6></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('дуже легке', true)">Всі дуже легкі</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('легке', true)">Всі легкі</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('середнє', true)">Всі середні</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('складне', true)">Всі складні</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('дуже складне', true)">Всі дуже складні</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.resetAllQuestions()">Скинути всі</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                    // Функція пошуку питань
+                    function performQuestionSearch() {
+                        const query = document.getElementById('search-questions').value;
+                        if (query.length >= 2) {
+                            QuestionFilter.searchQuestions(query);
+                        } else if (query.length === 0) {
+                            QuestionFilter.clearFilters();
+                        }
+                    }
+
+                    // Пошук при введенні тексту
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const searchInput = document.getElementById('search-questions');
+                        if (searchInput) {
+                            searchInput.addEventListener('input', function() {
+                                clearTimeout(this.searchTimeout);
+                                this.searchTimeout = setTimeout(() => {
+                                    performQuestionSearch();
+                                }, 300); // Затримка 300ms для оптимізації
+                            });
+
+                            // Пошук при натисканні Enter
+                            searchInput.addEventListener('keypress', function(e) {
+                                if (e.key === 'Enter') {
+                                    performQuestionSearch();
+                                }
+                            });
+                        }
+                    });
+                    </script>
 
                     <!-- Список питань -->
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5><i class="fas fa-list"></i> Список питань</h5>
-                            <div>
-                                <small class="text-muted">
+                            <div class="d-flex align-items-center">
+                                <small class="text-muted me-3">
                                     Всього: {{ questions|length }} |
                                     Використано: {{ questions|selectattr("is_used")|list|length }}
                                 </small>
+
+                                <!-- Кнопки сортування -->
+                                <div class="btn-group btn-group-sm me-2" role="group">
+                                    <button type="button" class="btn btn-outline-primary dropdown-toggle"
+                                            data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-sort"></i> Сортування
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><h6 class="dropdown-header">Сортувати за:</h6></li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=number&sort_order=asc">
+                                                <i class="fas fa-sort-numeric-down"></i> Номер (↑)
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=number&sort_order=desc">
+                                                <i class="fas fa-sort-numeric-up"></i> Номер (↓)
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=text&sort_order=asc">
+                                                <i class="fas fa-sort-alpha-down"></i> Алфавіт (А-Я)
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=text&sort_order=desc">
+                                                <i class="fas fa-sort-alpha-up"></i> Алфавіт (Я-А)
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=difficulty&sort_order=asc">
+                                                <i class="fas fa-sort-amount-down"></i> Складність (↑)
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=difficulty&sort_order=desc">
+                                                <i class="fas fa-sort-amount-up"></i> Складність (↓)
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=created_at&sort_order=desc">
+                                                <i class="fas fa-clock"></i> Нові спочатку
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="?sort_by=created_at&sort_order=asc">
+                                                <i class="fas fa-history"></i> Старі спочатку
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <!-- Додаткові дії -->
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-info" onclick="QuestionManager.resetAllQuestions()"
+                                            title="Скинути статус всіх питань">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success" onclick="renumberQuestions()"
+                                            title="Перенумерувати питання">
+                                        <i class="fas fa-sort-numeric-down"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
                         <div class="card-body">
                             {% if questions %}
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead class="table-dark">
                                             <tr>
-                                                <th>#</th>
+                                                <th style="width: 60px;">#</th>
                                                 <th>Питання</th>
-                                                <th>Нотатки</th>
-                                                <th>Статус</th>
-                                                <th>Дії</th>
+                                                <th style="width: 120px;">Складність</th>
+                                                <th style="width: 150px;">Нотатки</th>
+                                                <th style="width: 100px;">Статус</th>
+                                                <th style="width: 200px;">Дії</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {% for question in questions %}
                                             <tr class="{% if question.is_used %}table-secondary{% endif %}">
                                                 <td>
-                                                    <span class="badge bg-primary">{{ question.number }}</span>
+                                                    <span class="badge bg-primary fs-6">{{ question.number }}</span>
                                                 </td>
                                                 <td>
                                                     <div class="question-text">
-                                                        {{ question.text[:100] }}{% if question.text|length > 100 %}...{% endif %}
+                                                        {{ question.text[:80] }}{% if question.text|length > 80 %}...{% endif %}
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <small class="text-muted">{{ question.notes }}</small>
+                                                    <span class="badge bg-{{ question.difficulty_color }}">
+                                                        {{ question.difficulty_display }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">{{ question.notes[:30] }}{% if question.notes|length > 30 %}...{% endif %}</small>
                                                 </td>
                                                 <td>
                                                     {% if question.is_used %}
@@ -166,14 +376,15 @@
                                                         </form>
 
                                                         <!-- Редагувати -->
-                                                        <button class="btn btn-primary" onclick="editQuestion({{ question.id }}, '{{ question.text|replace("'", "\\'") }}', '{{ question.notes|replace("'", "\\'") }}')"
+                                                        <button class="btn btn-primary"
+                                                                onclick="editQuestion({{ question.id }}, '{{ question.text|replace("'", "\\'") }}', '{{ question.notes|replace("'", "\\'") }}', '{{ question.difficulty.value }}')"
                                                                 title="Редагувати">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
 
                                                         <!-- Видалити -->
                                                         <form method="post" action="/admin/questions/{{ question.id }}/delete"
-                                                              onsubmit="return confirm('Видалити це питання?')" style="display: inline;">
+                                                              onsubmit="return confirm('Видалити це питання? Номери інших питань будуть автоматично оновлені.')" style="display: inline;">
                                                             <button type="submit" class="btn btn-danger" title="Видалити">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
@@ -192,6 +403,50 @@
                                     <p class="text-muted">Почніть з додавання першого питання вище</p>
                                 </div>
                             {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Оновлене модальне вікно для редагування питання -->
+                <div class="modal fade" id="editQuestionModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form id="editQuestionForm" method="post">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Редагувати питання</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label for="edit_question_text" class="form-label">Текст питання</label>
+                                        <textarea class="form-control" id="edit_question_text"
+                                                name="question_text" rows="3" required></textarea>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="edit_difficulty" class="form-label">Складність</label>
+                                                <select class="form-select" id="edit_difficulty" name="difficulty" required>
+                                                    {% for value, display_name in difficulty_levels %}
+                                                        <option value="{{ value }}">{{ display_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="edit_notes" class="form-label">Нотатки</label>
+                                                <textarea class="form-control" id="edit_notes"
+                                                        name="notes" rows="2"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

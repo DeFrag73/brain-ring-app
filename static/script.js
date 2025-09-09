@@ -53,8 +53,8 @@ function showSection(sectionName) {
     console.log('Переключено на секцію:', sectionName);
 }
 
-// Функція для редагування питання
-function editQuestion(questionId, questionText, notes) {
+// Оновлена функція для редагування питання з підтримкою складності
+function editQuestion(questionId, questionText, notes, difficulty) {
     if (!editModal) {
         console.error('Модальне вікно редагування не знайдено');
         return;
@@ -63,6 +63,7 @@ function editQuestion(questionId, questionText, notes) {
     // Заповнити форму
     document.getElementById('edit_question_text').value = questionText;
     document.getElementById('edit_notes').value = notes || '';
+    document.getElementById('edit_difficulty').value = difficulty || 'medium';
 
     // Встановити action для форми
     const form = document.getElementById('editQuestionForm');
@@ -70,6 +71,33 @@ function editQuestion(questionId, questionText, notes) {
 
     // Показати модальне вікно
     editModal.show();
+}
+
+// Функція перенумерації питань
+function renumberQuestions() {
+    if (confirm('Перенумерувати всі питання за порядком створення?')) {
+        fetch('/admin/questions/renumber', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showNotification('Питання успішно перенумеровано', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                throw new Error('Помилка сервера');
+            }
+        })
+        .catch(error => {
+            console.error('Помилка перенумерації:', error);
+            showNotification('Помилка при перенумерації питань', 'error');
+        });
+    }
 }
 
 // Функція для підтвердження видалення
@@ -282,10 +310,12 @@ const TeamManager = {
 
 // Утиліти для роботи з питаннями
 const QuestionManager = {
-    // Швидке додавання питання
+    // Швидке додавання питання з вибором складності
     quickAdd: function() {
         const text = prompt('Введіть текст питання:');
         if (text && text.trim()) {
+            const difficulty = prompt('Оберіть складність (very_easy, easy, medium, hard, very_hard):', 'medium');
+
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/admin/questions/add';
@@ -295,40 +325,63 @@ const QuestionManager = {
             textInput.name = 'question_text';
             textInput.value = text.trim();
 
+            const difficultyInput = document.createElement('input');
+            difficultyInput.type = 'hidden';
+            difficultyInput.name = 'difficulty';
+            difficultyInput.value = difficulty || 'medium';
+
             const notesInput = document.createElement('input');
             notesInput.type = 'hidden';
             notesInput.name = 'notes';
             notesInput.value = '';
 
             form.appendChild(textInput);
+            form.appendChild(difficultyInput);
             form.appendChild(notesInput);
             document.body.appendChild(form);
             form.submit();
         }
     },
 
-    // Масове позначення питань як використані
-    markAllUsed: function() {
-        if (confirm('Позначити всі питання як використані?')) {
+    // Масове позначення питань за складністю
+    markByDifficulty: function(difficulty, markAsUsed = true) {
+        const message = `Позначити всі питання рівня "${difficulty}" як ${markAsUsed ? 'використані' : 'невикористані'}?`;
+        if (confirm(message)) {
             const forms = document.querySelectorAll('form[action*="toggle-used"]');
+            let count = 0;
+
             forms.forEach(form => {
-                const button = form.querySelector('button');
-                if (button && button.classList.contains('btn-secondary')) {
-                    form.submit();
+                const row = form.closest('tr');
+                const difficultyBadge = row.querySelector('.badge');
+                const isUsedBadge = row.querySelector('.badge.bg-secondary');
+
+                if (difficultyBadge && difficultyBadge.textContent.toLowerCase().includes(difficulty.toLowerCase())) {
+                    const shouldToggle = markAsUsed ? !isUsedBadge : isUsedBadge;
+                    if (shouldToggle) {
+                        setTimeout(() => form.submit(), count * 100); // Затримка для уникнення перевантаження
+                        count++;
+                    }
                 }
             });
+
+            if (count > 0) {
+                showNotification(`Буде оброблено ${count} питань`, 'info');
+            } else {
+                showNotification('Не знайдено підходящих питань', 'warning');
+            }
         }
     },
 
     // Скидання всіх питань
     resetAllQuestions: function() {
         if (confirm('Скинути статус всіх питань (позначити як невикористані)?')) {
-            // Реалізувати через API
             fetch('/api/questions/reset-all', { method: 'POST' })
                 .then(response => {
                     if (response.ok) {
                         showNotification('Статус питань скинуто', 'success');
                         setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        throw new Error('Помилка сервера');
                     }
                 })
                 .catch(error => {
@@ -338,7 +391,7 @@ const QuestionManager = {
         }
     },
 
-    // Імпорт питань з файлу
+    // Імпорт питань з файлу з підтримкою складності
     importQuestions: function() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -357,44 +410,290 @@ const QuestionManager = {
         const reader = new FileReader();
         reader.onload = function(e) {
             const content = e.target.result;
-            const questions = content.split('\n').filter(q => q.trim());
+            let questions = [];
+
+            if (file.name.endsWith('.csv')) {
+                // Обробка CSV формату: "Текст питання","Складність","Нотатки"
+                const lines = content.split('\n').filter(line => line.trim());
+                questions = lines.map(line => {
+                    const parts = line.split(',').map(part => part.replace(/"/g, '').trim());
+                    return {
+                        text: parts[0] || '',
+                        difficulty: parts[1] || 'medium',
+                        notes: parts[2] || ''
+                    };
+                }).filter(q => q.text);
+            } else {
+                // Обробка TXT формату: кожен рядок = питання з середньою складністю
+                const lines = content.split('\n').filter(line => line.trim());
+                questions = lines.map(line => ({
+                    text: line.trim(),
+                    difficulty: 'medium',
+                    notes: `Імпорт ${new Date().toLocaleDateString()}`
+                }));
+            }
 
             if (questions.length === 0) {
                 showNotification('Файл не містить питань', 'error');
                 return;
             }
 
-            if (confirm(`Знайдено ${questions.length} питань. Імпортувати?`)) {
-                QuestionManager.bulkAddQuestions(questions);
-            }
+            // Показати попередній перегляд
+            QuestionManager.showImportPreview(questions);
         };
         reader.readAsText(file);
     },
 
-    // Масове додавання питань
-    bulkAddQuestions: function(questions) {
-        const promises = questions.map((questionText, index) => {
-            const formData = new FormData();
-            formData.append('question_text', questionText.trim());
-            formData.append('notes', `Імпорт ${new Date().toLocaleDateString()}`);
+    // Показати попередній перегляд імпорту
+    showImportPreview: function(questions) {
+        const previewHtml = `
+            <div class="modal fade" id="importPreviewModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Попередній перегляд імпорту</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Знайдено <strong>${questions.length}</strong> питань:</p>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Питання</th>
+                                            <th>Складність</th>
+                                            <th>Нотатки</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${questions.slice(0, 10).map(q => `
+                                            <tr>
+                                                <td>${q.text.substring(0, 50)}${q.text.length > 50 ? '...' : ''}</td>
+                                                <td><span class="badge bg-info">${q.difficulty}</span></td>
+                                                <td>${q.notes}</td>
+                                            </tr>
+                                        `).join('')}
+                                        ${questions.length > 10 ? `<tr><td colspan="3" class="text-center">... і ще ${questions.length - 10}</td></tr>` : ''}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                            <button type="button" class="btn btn-primary" onclick="QuestionManager.bulkAddQuestions(${JSON.stringify(questions).replace(/"/g, '&quot;')})">
+                                Імпортувати всі
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
 
-            return fetch('/admin/questions/add', {
-                method: 'POST',
-                body: formData
+        document.body.insertAdjacentHTML('beforeend', previewHtml);
+        const modal = new bootstrap.Modal(document.getElementById('importPreviewModal'));
+        modal.show();
+
+        // Видалити модальне вікно після закриття
+        document.getElementById('importPreviewModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
+    },
+
+    // Масове додавання питань з підтримкою складності
+    bulkAddQuestions: function(questions) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('importPreviewModal'));
+        if (modal) modal.hide();
+
+        showNotification('Починаю імпорт питань...', 'info');
+
+        const promises = questions.map((question, index) => {
+            const formData = new FormData();
+            formData.append('question_text', question.text);
+            formData.append('difficulty', question.difficulty || 'medium');
+            formData.append('notes', question.notes || `Імпорт ${new Date().toLocaleDateString()}`);
+
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    fetch('/admin/questions/add', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            resolve();
+                        } else {
+                            reject(new Error(`Помилка для питання ${index + 1}`));
+                        }
+                    })
+                    .catch(reject);
+                }, index * 200); // Затримка між запитами
             });
         });
 
-        Promise.all(promises)
-            .then(() => {
-                showNotification(`Імпортовано ${questions.length} питань`, 'success');
+        Promise.allSettled(promises)
+            .then(results => {
+                const successful = results.filter(r => r.status === 'fulfilled').length;
+                const failed = results.length - successful;
+
+                if (failed === 0) {
+                    showNotification(`Успішно імпортовано ${successful} питань`, 'success');
+                } else {
+                    showNotification(`Імпортовано ${successful} питань, помилок: ${failed}`, 'warning');
+                }
+
                 setTimeout(() => window.location.reload(), 2000);
+            });
+    },
+
+    // Експорт питань в CSV
+    exportQuestions: function() {
+        fetch('/api/questions/export')
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `brainring_questions_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showNotification('Питання експортовано', 'success');
             })
             .catch(error => {
-                console.error('Помилка імпорту:', error);
-                showNotification('Помилка при імпорті питань', 'error');
+                console.error('Помилка експорту:', error);
+                showNotification('Помилка при експорті питань', 'error');
+            });
+    },
+
+    // Оновлення статистики складності в реальному часі
+    updateDifficultyStats: function() {
+        fetch('/api/difficulty-stats')
+            .then(response => response.json())
+            .then(stats => {
+                // Оновити статистику на сторінці
+                Object.keys(stats).forEach(difficulty => {
+                    const stat = stats[difficulty];
+                    const element = document.querySelector(`[data-difficulty="${difficulty}"]`);
+                    if (element) {
+                        element.querySelector('.available-count').textContent = stat.available;
+                        element.querySelector('.total-count').textContent = stat.total;
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Помилка оновлення статистики:', error);
             });
     }
 };
+
+/ Розширені функції сортування та фільтрації
+const QuestionFilter = {
+    // Фільтрація питань за складністю
+    filterByDifficulty: function(difficulty) {
+        const rows = document.querySelectorAll('#questions-section tbody tr');
+        rows.forEach(row => {
+            const difficultyBadge = row.querySelector('td:nth-child(3) .badge');
+            if (difficulty === 'all' || (difficultyBadge && difficultyBadge.textContent.toLowerCase().includes(difficulty))) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    },
+
+    // Фільтрація за статусом
+    filterByStatus: function(status) {
+        const rows = document.querySelectorAll('#questions-section tbody tr');
+        rows.forEach(row => {
+            const statusBadge = row.querySelector('td:nth-child(5) .badge');
+            if (status === 'all') {
+                row.style.display = '';
+            } else if (status === 'used' && statusBadge && statusBadge.classList.contains('bg-secondary')) {
+                row.style.display = '';
+            } else if (status === 'available' && statusBadge && statusBadge.classList.contains('bg-success')) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    },
+
+    // Пошук в тексті питань
+    searchQuestions: function(query) {
+        const rows = document.querySelectorAll('#questions-section tbody tr');
+        const lowerQuery = query.toLowerCase();
+
+        rows.forEach(row => {
+            const questionText = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+            const notes = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
+
+            if (questionText.includes(lowerQuery) || notes.includes(lowerQuery)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    },
+
+    // Очистити всі фільтри
+    clearFilters: function() {
+        const rows = document.querySelectorAll('#questions-section tbody tr');
+        rows.forEach(row => {
+            row.style.display = '';
+        });
+
+        // Очистити поля пошуку та фільтрів
+        document.querySelectorAll('.filter-input').forEach(input => {
+            input.value = '';
+        });
+        document.querySelectorAll('.filter-select').forEach(select => {
+            select.value = 'all';
+        });
+    }
+};
+
+// Додавання панелі швидких дій
+const QuickActionsPanel = {
+    init: function() {
+        const panel = document.createElement('div');
+        panel.className = 'quick-actions-panel position-fixed';
+        panel.style.cssText = 'bottom: 80px; right: 20px; z-index: 999;';
+        panel.innerHTML = `
+            <div class="btn-group-vertical" role="group">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="QuestionManager.quickAdd()" title="Швидко додати питання">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" onclick="renumberQuestions()" title="Перенумерувати">
+                    <i class="fas fa-sort-numeric-down"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="QuestionManager.exportQuestions()" title="Експорт питань">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="QuestionManager.updateDifficultyStats()" title="Оновити статистику">
+                    <i class="fas fa-sync"></i>
+                </button>
+            </div>
+        `;
+
+        // Додати тільки якщо в секції питань
+        if (document.getElementById('questions-section')) {
+            document.body.appendChild(panel);
+        }
+    }
+};
+
+// Ініціалізація при завантаженні
+document.addEventListener('DOMContentLoaded', function() {
+    QuickActionsPanel.init();
+
+    // Автооновлення статистики кожні 30 секунд
+    setInterval(() => {
+        if (currentSection === 'questions') {
+            QuestionManager.updateDifficultyStats();
+        }
+    }, 30000);
+});
 
 // Утиліти для статистики
 const StatsManager = {
