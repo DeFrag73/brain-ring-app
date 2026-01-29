@@ -165,10 +165,9 @@ async def admin_panel(
         else:
             questions_query = questions_query.order_by(models.Question.text.asc())
     elif sort_by == "difficulty":
-        if sort_order == "desc":
-            questions_query = questions_query.order_by(models.Question.difficulty.desc())
-        else:
-            questions_query = questions_query.order_by(models.Question.difficulty.asc())
+        # Отримуємо всі питання і сортуємо вручну за числовим порядком
+        questions = questions_query.all()
+        questions.sort(key=lambda q: DifficultyLevel.get_sort_order(q.difficulty), reverse=(sort_order == "desc"))
     elif sort_by == "created_at":
         if sort_order == "desc":
             questions_query = questions_query.order_by(models.Question.created_at.desc())
@@ -180,7 +179,9 @@ async def admin_panel(
         else:
             questions_query = questions_query.order_by(models.Question.number.asc())
 
-    questions = questions_query.all()
+    # Отримуємо питання (якщо ще не отримали при сортуванні за складністю)
+    if sort_by != "difficulty":
+        questions = questions_query.all()
     teams = db.query(models.Team).all()
     current_game = db.query(models.CurrentGame).first()
 

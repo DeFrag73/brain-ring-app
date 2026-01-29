@@ -42,13 +42,13 @@ class DifficultyLevel(enum.Enum):
 
     @classmethod
     def get_sort_order(cls, value):
-        """Повертає числовий порядок для сортування (від найскладніших до найлегших)"""
+        """Повертає числовий порядок для сортування (від найлегших до найскладніших)"""
         sort_orders = {
-            cls.VERY_HARD: 1,
-            cls.HARD: 2,
+            cls.VERY_EASY: 1,
+            cls.EASY: 2,
             cls.MEDIUM: 3,
-            cls.EASY: 4,
-            cls.VERY_EASY: 5
+            cls.HARD: 4,
+            cls.VERY_HARD: 5
         }
         return sort_orders.get(value, 999)
 

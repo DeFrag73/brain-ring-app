@@ -587,7 +587,7 @@ const QuestionManager = {
     }
 };
 
-/ Розширені функції сортування та фільтрації
+// Розширені функції сортування та фільтрації
 const QuestionFilter = {
     // Фільтрація питань за складністю
     filterByDifficulty: function(difficulty) {
