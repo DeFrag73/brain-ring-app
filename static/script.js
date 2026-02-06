@@ -310,37 +310,25 @@ const TeamManager = {
 
 // Утиліти для роботи з питаннями
 const QuestionManager = {
-    // Швидке додавання питання з вибором складності
+    // Швидке додавання питання з вибором складності через модальне вікно
     quickAdd: function() {
-        const text = prompt('Введіть текст питання:');
-        if (text && text.trim()) {
-            const difficulty = prompt('Оберіть складність (very_easy, easy, medium, hard, very_hard):', 'medium');
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/admin/questions/add';
-
-            const textInput = document.createElement('input');
-            textInput.type = 'hidden';
-            textInput.name = 'question_text';
-            textInput.value = text.trim();
-
-            const difficultyInput = document.createElement('input');
-            difficultyInput.type = 'hidden';
-            difficultyInput.name = 'difficulty';
-            difficultyInput.value = difficulty || 'medium';
-
-            const notesInput = document.createElement('input');
-            notesInput.type = 'hidden';
-            notesInput.name = 'notes';
-            notesInput.value = '';
-
-            form.appendChild(textInput);
-            form.appendChild(difficultyInput);
-            form.appendChild(notesInput);
-            document.body.appendChild(form);
-            form.submit();
+        const modalElement = document.getElementById('quickAddModal');
+        if (!modalElement) {
+            console.error('Модальне вікно швидкого додавання не знайдено');
+            return;
         }
+
+        // Очистити попередні значення
+        document.getElementById('quick_question_text').value = '';
+        document.getElementById('quick_difficulty').value = 'medium';
+
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Автофокус на поле тексту
+        modalElement.addEventListener('shown.bs.modal', function () {
+            document.getElementById('quick_question_text').focus();
+        }, { once: true });
     },
 
     // Масове позначення питань за складністю
