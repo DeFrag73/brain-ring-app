@@ -126,21 +126,6 @@ body {
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Стилі для панелі швидких дій */
-.quick-actions-panel {
-    background: white;
-    border-radius: 0.75rem;
-    padding: 0.5rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.quick-actions-panel .btn {
-    border-radius: 0.5rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-    min-width: 2.5rem;
-}
-
 /* Стилі для модальних вікон */
 .modal-content {
     border: none;

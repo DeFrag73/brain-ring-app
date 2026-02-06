@@ -580,6 +580,7 @@ const QuestionManager = {
                         element.querySelector('.total-count').textContent = stat.total;
                     }
                 });
+                showNotification('Статистику оновлено', 'success');
             })
             .catch(error => {
                 console.error('Помилка оновлення статистики:', error);
@@ -653,39 +654,11 @@ const QuestionFilter = {
     }
 };
 
-// Додавання панелі швидких дій
-const QuickActionsPanel = {
-    init: function() {
-        const panel = document.createElement('div');
-        panel.className = 'quick-actions-panel position-fixed';
-        panel.style.cssText = 'bottom: 80px; right: 20px; z-index: 999;';
-        panel.innerHTML = `
-            <div class="btn-group-vertical" role="group">
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="QuestionManager.quickAdd()" title="Швидко додати питання">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-info" onclick="renumberQuestions()" title="Перенумерувати">
-                    <i class="fas fa-sort-numeric-down"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success" onclick="QuestionManager.exportQuestions()" title="Експорт питань">
-                    <i class="fas fa-download"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="QuestionManager.updateDifficultyStats()" title="Оновити статистику">
-                    <i class="fas fa-sync"></i>
-                </button>
-            </div>
-        `;
 
-        // Додати тільки якщо в секції питань
-        if (document.getElementById('questions-section')) {
-            document.body.appendChild(panel);
-        }
-    }
-};
 
 // Ініціалізація при завантаженні
 document.addEventListener('DOMContentLoaded', function() {
-    QuickActionsPanel.init();
+    // Видалено QuickActionsPanel.init();
 
     // Автооновлення статистики кожні 30 секунд
     setInterval(() => {

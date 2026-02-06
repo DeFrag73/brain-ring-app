@@ -305,13 +305,21 @@
 
                                 <!-- Додаткові дії -->
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-info" onclick="QuestionManager.resetAllQuestions()"
-                                            title="Скинути статус всіх питань">
-                                        <i class="fas fa-undo"></i>
+                                    <button type="button" class="btn btn-outline-success" onclick="QuestionManager.exportQuestions()"
+                                            title="Експортувати питання">
+                                        <i class="fas fa-download"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-success" onclick="renumberQuestions()"
+                                    <button type="button" class="btn btn-outline-info" onclick="QuestionManager.updateDifficultyStats()"
+                                            title="Оновити статистику">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="renumberQuestions()"
                                             title="Перенумерувати питання">
                                         <i class="fas fa-sort-numeric-down"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning" onclick="QuestionManager.resetAllQuestions()"
+                                            title="Скинути статус всіх питань">
+                                        <i class="fas fa-undo"></i>
                                     </button>
                                 </div>
                             </div>
