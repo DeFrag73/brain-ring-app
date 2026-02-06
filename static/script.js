@@ -14,8 +14,12 @@ document.addEventListener('DOMContentLoaded', function() {
         editModal = new bootstrap.Modal(editModalElement);
     }
 
-    // Встановлення активної секції
-    showSection('questions');
+    // Відновлення активної секції: пріоритет — URL параметр > localStorage > 'questions'
+    const urlParams = new URLSearchParams(window.location.search);
+    const sectionFromUrl = urlParams.get('section');
+    const sectionFromStorage = localStorage.getItem('activeSection');
+    const initialSection = sectionFromUrl || sectionFromStorage || 'questions';
+    showSection(initialSection);
 
     // Автоматичне оновлення статусу гри
     startGameStatusUpdates();
@@ -50,6 +54,10 @@ function showSection(sectionName) {
     }
 
     currentSection = sectionName;
+
+    // Зберегти активну секцію в localStorage
+    localStorage.setItem('activeSection', sectionName);
+
     console.log('Переключено на секцію:', sectionName);
 }
 

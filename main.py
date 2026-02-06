@@ -17,6 +17,14 @@ from database import get_db
 from sqlalchemy import func
 from models import DifficultyLevel
 
+def admin_redirect(section: str = "questions", extra_params: dict = None) -> RedirectResponse:
+    """Створює RedirectResponse на /admin з параметром секції"""
+    params = {"section": section}
+    if extra_params:
+        params.update(extra_params)
+    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    return RedirectResponse(f"/admin?{query_string}", status_code=303)
+
 # Створення FastAPI додатку
 app = FastAPI(title="Брейн-ринг", description="Додаток для проведення ігор Брейн-ринг")
 
@@ -281,7 +289,7 @@ def renumber_questions(db: Session):
 async def add_question(
         question_text: str = Form(...),
         notes: str = Form(""),
-        difficulty: str = Form("medium"),  # Додаємо параметр складності
+        difficulty: str = Form("medium"),
         admin: str = Depends(get_current_admin),
         db: Session = Depends(get_db)
 ):
@@ -307,7 +315,7 @@ async def add_question(
     # Перенумеровуємо всі питання
     renumber_questions(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("questions")
 
 
 @app.post("/admin/questions/{question_id}/edit")
@@ -315,7 +323,7 @@ async def edit_question(
         question_id: int,
         question_text: str = Form(...),
         notes: str = Form(""),
-        difficulty: str = Form("medium"),  # Додаємо параметр складності
+        difficulty: str = Form("medium"),
         admin: str = Depends(get_current_admin),
         db: Session = Depends(get_db)
 ):
@@ -340,7 +348,7 @@ async def edit_question(
     if current_game and current_game.current_question_id == question_id:
         await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("questions")
 
 
 @app.post("/admin/questions/{question_id}/delete")
@@ -366,7 +374,7 @@ async def delete_question(
         # Перенумеровуємо всі питання після видалення
         renumber_questions(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("questions")
 
 
 @app.post("/admin/questions/{question_id}/toggle-used")
@@ -380,7 +388,7 @@ async def toggle_question_used(
     if question:
         question.is_used = not question.is_used
         db.commit()
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("questions")
 
 
 # ============= API для управління командами =============
@@ -401,7 +409,7 @@ async def add_team(
     )
     db.add(team)
     db.commit()
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("teams")
 
 
 @app.post("/admin/teams/{team_id}/delete")
@@ -439,7 +447,7 @@ async def delete_team(
         if update_display:
             await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("teams")
 
 
 # ============= API для управління грою =============
@@ -466,7 +474,7 @@ async def set_current_teams(
     # Миттєво оновлюємо display
     await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("game")
 
 
 @app.post("/admin/game/show-question/{question_id}")
@@ -485,7 +493,7 @@ async def show_question(
         # Миттєво оновлюємо display
         await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("questions")
 
 
 @app.post("/admin/game/hide-question")
@@ -502,12 +510,12 @@ async def hide_question(
         # Миттєво оновлюємо display
         await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("game")
 
 
 @app.post("/admin/game/add-score")
 async def add_score(
-        team: str = Form(...),  # "team1" або "team2"
+        team: str = Form(...),
         points: float = Form(...),
         admin: str = Depends(get_current_admin),
         db: Session = Depends(get_db)
@@ -533,7 +541,7 @@ async def add_score(
         # Миттєво оновлюємо display
         await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("game")
 
 
 @app.post("/admin/game/finish-round")
@@ -574,7 +582,7 @@ async def finish_round(
         # Миттєво оновлюємо display
         await broadcast_display_update(db)
 
-    return RedirectResponse("/admin", status_code=303)
+    return admin_redirect("game")
 
 
 # ============= ЕКРАН ГЛЯДАЧІВ =============
