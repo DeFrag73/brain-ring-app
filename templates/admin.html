@@ -149,63 +149,116 @@
                     </div>
 
                     <!-- Панель фільтрів та пошуку для секції питань -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6><i class="fas fa-filter"></i> Фільтри та пошук</h6>
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-filter"></i> Фільтри та пошук</h6>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="QuestionFilter.clearAllFilters()" type="button">
+                                    <i class="fas fa-times"></i> Скинути всі
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
-                            <div class="row align-items-end">
-                                <div class="col-md-4">
-                                    <label for="search-questions" class="form-label">Пошук в питаннях</label>
+                            <div class="row g-3">
+                                <!-- Пошук -->
+                                <div class="col-md-5">
+                                    <label for="search-questions" class="form-label fw-bold">
+                                        <i class="fas fa-search"></i> Пошук в питаннях
+                                    </label>
                                     <div class="input-group">
-                                        <input type="text" id="search-questions" class="form-control filter-input"
-                                               placeholder="Введіть текст для пошуку...">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="performQuestionSearch()">
-                                            <i class="fas fa-search"></i>
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text"
+                                               id="search-questions"
+                                               class="form-control"
+                                               placeholder="Введіть текст для пошуку..."
+                                               aria-label="Пошук питань">
+                                        <button class="btn btn-outline-secondary"
+                                                type="button"
+                                                onclick="document.getElementById('search-questions').value = ''; QuestionFilter.setSearchFilter('');">
+                                            <i class="fas fa-times"></i>
                                         </button>
                                     </div>
+                                    <small class="text-muted">Пошук в тексті питань та нотатках</small>
                                 </div>
-                                <div class="col-md-2">
-                                    <label for="filter-difficulty" class="form-label">Складність</label>
-                                    <select id="filter-difficulty" class="form-select filter-select" onchange="QuestionFilter.filterByDifficulty(this.value)">
-                                        <option value="all">Всі рівні</option>
+
+                                <!-- Фільтр складності -->
+                                <div class="col-md-3">
+                                    <label for="filter-difficulty" class="form-label fw-bold">
+                                        <i class="fas fa-layer-group"></i> Складність
+                                    </label>
+                                    <select id="filter-difficulty" class="form-select">
+                                        <option value="">Всі рівні</option>
                                         {% for value, display_name in difficulty_levels %}
-                                            <option value="{{ display_name.lower() }}">{{ display_name }}</option>
+                                            <option value="{{ display_name }}">{{ display_name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-md-2">
-                                    <label for="filter-status" class="form-label">Статус</label>
-                                    <select id="filter-status" class="form-select filter-select" onchange="QuestionFilter.filterByStatus(this.value)">
-                                        <option value="all">Всі питання</option>
-                                        <option value="available">Доступні</option>
-                                        <option value="used">Використані</option>
+
+                                <!-- Фільтр статусу -->
+                                <div class="col-md-3">
+                                    <label for="filter-status" class="form-label fw-bold">
+                                        <i class="fas fa-check-circle"></i> Статус
+                                    </label>
+                                    <select id="filter-status" class="form-select">
+                                        <option value="">Всі питання</option>
+                                        <option value="available">✓ Доступні</option>
+                                        <option value="used">✗ Використані</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="btn-group w-100" role="group">
-                                        <button type="button" class="btn btn-outline-primary" onclick="QuestionFilter.clearFilters()">
-                                            <i class="fas fa-times"></i> Очистити фільтри
-                                        </button>
-                                        <button type="button" class="btn btn-outline-info dropdown-toggle"
-                                                data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="fas fa-magic"></i> Швидкі дії
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            <li><h6 class="dropdown-header">Позначити як використані</h6></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('дуже легке', true)">Всі дуже легкі</a></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('легке', true)">Всі легкі</a></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('середнє', true)">Всі середні</a></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('складне', true)">Всі складні</a></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.markByDifficulty('дуже складне', true)">Всі дуже складні</a></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a class="dropdown-item" href="#" onclick="QuestionManager.resetAllQuestions()">Скинути всі</a></li>
-                                        </ul>
+
+                                <!-- Швидкі дії -->
+                                <div class="col-md-1 d-flex align-items-end">
+                                    <button type="button"
+                                            class="btn btn-outline-primary w-100 dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                            title="Швидкі фільтри">
+                                        <i class="fas fa-bolt"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><h6 class="dropdown-header"><i class="fas fa-filter"></i> Швидкі фільтри</h6></li>
+                                        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('filter-status').value='available'; QuestionFilter.setStatusFilter('available');">
+                                            <i class="fas fa-check text-success"></i> Тільки доступні
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('filter-status').value='used'; QuestionFilter.setStatusFilter('used');">
+                                            <i class="fas fa-times text-secondary"></i> Тільки використані
+                                        </a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><h6 class="dropdown-header"><i class="fas fa-layer-group"></i> За складністю</h6></li>
+                                        {% for value, display_name in difficulty_levels %}
+                                        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('filter-difficulty').value='{{ display_name }}'; QuestionFilter.setDifficultyFilter('{{ display_name }}');">
+                                            {{ display_name }}
+                                        </a></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+
+                                <!-- Активні фільтри (бейджі) -->
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="d-flex align-items-center">
+                                            <span class="text-muted me-2" id="active-filters-label" style="display: none;">
+                                                <i class="fas fa-filter"></i> Активні фільтри:
+                                            </span>
+                                            <div id="active-filters-container"
+                                                 class="d-flex flex-wrap align-items-center"
+                                                 style="display: none !important;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Лічильник результатів -->
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <div id="results-counter" class="text-center">
+                                            <small class="text-muted">Показано всі {{ questions|length }} питань</small>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
                     <script>
                     // Функція пошуку питань

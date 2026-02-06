@@ -590,82 +590,260 @@ const QuestionManager = {
 
 // Розширені функції сортування та фільтрації
 const QuestionFilter = {
-    // Фільтрація питань за складністю
-    filterByDifficulty: function(difficulty) {
-        const rows = document.querySelectorAll('#questions-section tbody tr');
-        rows.forEach(row => {
-            const difficultyBadge = row.querySelector('td:nth-child(3) .badge');
-            if (difficulty === 'all' || (difficultyBadge && difficultyBadge.textContent.toLowerCase().includes(difficulty))) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+    activeFilters: {
+        search: '',
+        difficulty: '',
+        status: ''
     },
 
-    // Фільтрація за статусом
-    filterByStatus: function(status) {
+    // Застосувати всі фільтри одночасно
+    applyAllFilters: function() {
         const rows = document.querySelectorAll('#questions-section tbody tr');
+        let visibleCount = 0;
+
         rows.forEach(row => {
-            const statusBadge = row.querySelector('td:nth-child(5) .badge');
-            if (status === 'all') {
-                row.style.display = '';
-            } else if (status === 'used' && statusBadge && statusBadge.classList.contains('bg-secondary')) {
-                row.style.display = '';
-            } else if (status === 'available' && statusBadge && statusBadge.classList.contains('bg-success')) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
+            let isVisible = true;
+
+            // Фільтр за пошуковим запитом
+            if (this.activeFilters.search) {
+                const questionText = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                const notes = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
+                const lowerQuery = this.activeFilters.search.toLowerCase();
+
+                if (!questionText.includes(lowerQuery) && !notes.includes(lowerQuery)) {
+                    isVisible = false;
+                }
             }
+
+            // Фільтр за складністю
+            if (this.activeFilters.difficulty && isVisible) {
+                const difficultyBadge = row.querySelector('td:nth-child(3) .badge');
+                if (!difficultyBadge || !difficultyBadge.textContent.toLowerCase().includes(this.activeFilters.difficulty.toLowerCase())) {
+                    isVisible = false;
+                }
+            }
+
+            // Фільтр за статусом
+            if (this.activeFilters.status && isVisible) {
+                const statusBadge = row.querySelector('td:nth-child(5) .badge');
+                if (this.activeFilters.status === 'used') {
+                    if (!statusBadge || !statusBadge.classList.contains('bg-secondary')) {
+                        isVisible = false;
+                    }
+                } else if (this.activeFilters.status === 'available') {
+                    if (!statusBadge || !statusBadge.classList.contains('bg-success')) {
+                        isVisible = false;
+                    }
+                }
+            }
+
+            row.style.display = isVisible ? '' : 'none';
+            if (isVisible) visibleCount++;
         });
+
+        // Оновити бейджі активних фільтрів
+        this.updateFilterBadges();
+
+        // Оновити лічильник результатів
+        this.updateResultsCount(visibleCount, rows.length);
     },
 
-    // Пошук в тексті питань
-    searchQuestions: function(query) {
-        const rows = document.querySelectorAll('#questions-section tbody tr');
-        const lowerQuery = query.toLowerCase();
+    // Встановити фільтр пошуку
+    setSearchFilter: function(query) {
+        this.activeFilters.search = query;
+        this.applyAllFilters();
+    },
 
-        rows.forEach(row => {
-            const questionText = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
-            const notes = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
+    // Встановити фільтр складності
+    setDifficultyFilter: function(difficulty) {
+        this.activeFilters.difficulty = difficulty;
+        this.applyAllFilters();
+    },
 
-            if (questionText.includes(lowerQuery) || notes.includes(lowerQuery)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+    // Встановити фільтр статусу
+    setStatusFilter: function(status) {
+        this.activeFilters.status = status;
+        this.applyAllFilters();
+    },
+
+    // Видалити конкретний фільтр
+    removeFilter: function(filterType) {
+        this.activeFilters[filterType] = '';
+
+        // Очистити відповідне поле вводу
+        if (filterType === 'search') {
+            const searchInput = document.getElementById('search-questions');
+            if (searchInput) searchInput.value = '';
+        } else if (filterType === 'difficulty') {
+            const difficultySelect = document.getElementById('filter-difficulty');
+            if (difficultySelect) difficultySelect.value = '';
+        } else if (filterType === 'status') {
+            const statusSelect = document.getElementById('filter-status');
+            if (statusSelect) statusSelect.value = '';
+        }
+
+        this.applyAllFilters();
     },
 
     // Очистити всі фільтри
-    clearFilters: function() {
-        const rows = document.querySelectorAll('#questions-section tbody tr');
-        rows.forEach(row => {
-            row.style.display = '';
-        });
+    clearAllFilters: function() {
+        this.activeFilters = {
+            search: '',
+            difficulty: '',
+            status: ''
+        };
 
-        // Очистити поля пошуку та фільтрів
-        document.querySelectorAll('.filter-input').forEach(input => {
-            input.value = '';
-        });
-        document.querySelectorAll('.filter-select').forEach(select => {
-            select.value = 'all';
-        });
+        // Очистити всі поля
+        const searchInput = document.getElementById('search-questions');
+        if (searchInput) searchInput.value = '';
+
+        const difficultySelect = document.getElementById('filter-difficulty');
+        if (difficultySelect) difficultySelect.value = '';
+
+        const statusSelect = document.getElementById('filter-status');
+        if (statusSelect) statusSelect.value = '';
+
+        this.applyAllFilters();
+    },
+
+    // Оновити бейджі активних фільтрів
+    updateFilterBadges: function() {
+        const container = document.getElementById('active-filters-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // Додати бейдж для пошуку
+        if (this.activeFilters.search) {
+            container.appendChild(this.createFilterBadge(
+                'search',
+                `Пошук: "${this.activeFilters.search}"`,
+                'primary'
+            ));
+        }
+
+        // Додати бейдж для складності
+        if (this.activeFilters.difficulty) {
+            container.appendChild(this.createFilterBadge(
+                'difficulty',
+                `Складність: ${this.activeFilters.difficulty}`,
+                'info'
+            ));
+        }
+
+        // Додати бейдж для статусу
+        if (this.activeFilters.status) {
+            const statusText = this.activeFilters.status === 'used' ? 'Використані' : 'Доступні';
+            container.appendChild(this.createFilterBadge(
+                'status',
+                `Статус: ${statusText}`,
+                'warning'
+            ));
+        }
+
+        // Показати/сховати контейнер
+        const hasFilters = this.activeFilters.search || this.activeFilters.difficulty || this.activeFilters.status;
+        container.style.display = hasFilters ? 'flex' : 'none';
+    },
+
+    // Створити бейдж фільтра
+    createFilterBadge: function(filterType, text, colorClass) {
+        const badge = document.createElement('span');
+        badge.className = `badge bg-${colorClass} me-2 mb-2 d-inline-flex align-items-center`;
+        badge.style.fontSize = '0.9rem';
+        badge.style.padding = '0.5rem 0.75rem';
+        badge.style.cursor = 'default';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = text;
+        textSpan.style.marginRight = '0.5rem';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close btn-close-white';
+        closeBtn.style.fontSize = '0.6rem';
+        closeBtn.style.padding = '0';
+        closeBtn.style.marginLeft = '0.5rem';
+        closeBtn.onclick = () => this.removeFilter(filterType);
+
+        badge.appendChild(textSpan);
+        badge.appendChild(closeBtn);
+
+        return badge;
+    },
+
+    // Оновити лічильник результатів
+    updateResultsCount: function(visible, total) {
+        const counter = document.getElementById('results-counter');
+        if (!counter) return;
+
+        if (visible === total) {
+            counter.innerHTML = `<small class="text-muted">Показано всі ${total} питань</small>`;
+        } else {
+            counter.innerHTML = `<small class="text-success"><strong>Знайдено: ${visible}</strong> з ${total} питань</small>`;
+        }
+    },
+
+    // Застарілі методи для зворотної сумісності
+    filterByDifficulty: function(difficulty) {
+        this.setDifficultyFilter(difficulty);
+    },
+
+    filterByStatus: function(status) {
+        this.setStatusFilter(status);
+    },
+
+    searchQuestions: function(query) {
+        this.setSearchFilter(query);
+    },
+
+    clearFilters: function() {
+        this.clearAllFilters();
     }
 };
 
-
+// Функція пошуку питань
+function performQuestionSearch() {
+    const query = document.getElementById('search-questions').value;
+    QuestionFilter.setSearchFilter(query);
+}
 
 // Ініціалізація при завантаженні
 document.addEventListener('DOMContentLoaded', function() {
-    // Видалено QuickActionsPanel.init();
+    const searchInput = document.getElementById('search-questions');
+    if (searchInput) {
+        // Пошук при введенні тексту з затримкою
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performQuestionSearch();
+            }, 300);
+        });
 
-    // Автооновлення статистики кожні 30 секунд
-    setInterval(() => {
-        if (currentSection === 'questions') {
-            QuestionManager.updateDifficultyStats();
-        }
-    }, 30000);
+        // Пошук при натисканні Enter
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performQuestionSearch();
+            }
+        });
+    }
+
+    // Слухачі для селектів фільтрів
+    const difficultySelect = document.getElementById('filter-difficulty');
+    if (difficultySelect) {
+        difficultySelect.addEventListener('change', function() {
+            QuestionFilter.setDifficultyFilter(this.value);
+        });
+    }
+
+    const statusSelect = document.getElementById('filter-status');
+    if (statusSelect) {
+        statusSelect.addEventListener('change', function() {
+            QuestionFilter.setStatusFilter(this.value);
+        });
+    }
 });
 
 // Утиліти для статистики
