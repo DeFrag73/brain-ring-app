@@ -209,6 +209,17 @@ body {
     background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
     min-height: 100vh;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.sidebar .position-sticky {
+    position: sticky;
+    top: 0;
 }
 
 .sidebar .nav-link {
@@ -231,10 +242,38 @@ body {
     margin-right: 0.5rem;
 }
 
+/* Компенсація для основного контенту */
+main.col-md-9.ms-sm-auto.col-lg-10 {
+    margin-left: auto;
+}
+
+/* Додаткові стилі для респонсивності */
+@media (min-width: 768px) {
+    main.col-md-9.ms-sm-auto.col-lg-10 {
+        margin-left: 25%; /* Ширина sidebar для col-md-3 */
+    }
+}
+
+@media (min-width: 992px) {
+    main.col-md-9.ms-sm-auto.col-lg-10 {
+        margin-left: 16.666667%; /* Ширина sidebar для col-lg-2 */
+    }
+}
+
 /* Адаптивні стилі */
 @media (max-width: 768px) {
+    /* Сайдбар на мобільних - не фіксований */
     .sidebar {
+        position: relative;
         min-height: auto;
+        width: 100%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Основний контент без відступу зліва */
+    main.col-md-9.ms-sm-auto.col-lg-10 {
+        margin-left: 0 !important;
+        width: 100%;
     }
 
     .score-display {
