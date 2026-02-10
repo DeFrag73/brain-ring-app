@@ -143,8 +143,22 @@ class Settings(Base):
     value = Column(String(200), nullable=False)
     description = Column(Text, default="")
 
-    # Приклади налаштувань:
-    # - display_theme: "dark" або "light"
-    # - default_points: "1" (скільки балів за правильну відповідь)
-    # - round_time: "60" (час на відповідь в секундах)
-    # - tournament_name: "Брейн-ринг 2025"
+
+class TournamentBracket(Base):
+    """Модель для турнірної сітки"""
+    __tablename__ = "tournament_bracket"
+
+    id = Column(Integer, primary_key=True, index=True)
+    round_number = Column(Integer, nullable=False)        # Номер раунду (1 = 1/8, 2 = 1/4, 3 = 1/2, 4 = фінал)
+    match_number = Column(Integer, nullable=False)          # Номер матчу в раунді
+    team1_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    team2_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    winner_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    team1_score = Column(Float, default=0)
+    team2_score = Column(Float, default=0)
+    is_completed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    team1 = relationship("Team", foreign_keys=[team1_id])
+    team2 = relationship("Team", foreign_keys=[team2_id])
+    winner = relationship("Team", foreign_keys=[winner_id])

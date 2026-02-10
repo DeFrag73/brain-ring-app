@@ -742,45 +742,127 @@
                     {% endif %}
                 </div>
 
-                <!-- Секція Статистика -->
+                                <!-- Секція Статистика -->
                 <div id="stats-section" class="content-section" style="display: none;">
-                    <h3><i class="fas fa-chart-bar"></i> Статистика</h3>
+                    <h3><i class="fas fa-chart-bar"></i> Статистика та Турнір</h3>
 
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-trophy"></i> Рейтинг команд</h5>
+                    <!-- Рейтинг команд -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-trophy"></i> Рейтинг команд</h5>
                         </div>
                         <div class="card-body">
                             {% if team_stats %}
                                 <div class="table-responsive">
-                                    <table class="table table-striped">
+                                    <table class="table table-striped table-hover">
                                         <thead class="table-dark">
                                             <tr>
+                                                <th style="width: 40px;">#</th>
                                                 <th>Команда</th>
-                                                <th>Перемоги</th>
-                                                <th>Зіграно ігор</th>
-                                                <th>% перемог</th>
+                                                <th class="text-center">Бали</th>
+                                                <th class="text-center">Перемоги</th>
+                                                <th class="text-center">Поразки</th>
+                                                <th class="text-center">Нічиї</th>
+                                                <th class="text-center">Ігор</th>
+                                                <th class="text-center">% перемог</th>
+                                                <th>Історія ігор</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {% for stat in team_stats %}
                                             <tr>
                                                 <td>
-                                                    <strong>{{ stat.team.name }}</strong>
-                                                    <br><small class="text-muted">{{ stat.team.captain }}</small>
+                                                    {% if loop.index == 1 %}
+                                                        <span class="badge bg-warning text-dark fs-6">🥇</span>
+                                                    {% elif loop.index == 2 %}
+                                                        <span class="badge bg-secondary fs-6">🥈</span>
+                                                    {% elif loop.index == 3 %}
+                                                        <span class="badge bg-danger fs-6">🥉</span>
+                                                    {% else %}
+                                                        <span class="badge bg-light text-dark">{{ loop.index }}</span>
+                                                    {% endif %}
                                                 </td>
                                                 <td>
+                                                    <strong>{{ stat.team.name }}</strong>
+                                                    {% if stat.team.captain %}
+                                                        <br><small class="text-muted"><i class="fas fa-crown text-warning"></i> {{ stat.team.captain }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-primary fs-6">{{ stat.total_points }}</span>
+                                                </td>
+                                                <td class="text-center">
                                                     <span class="badge bg-success">{{ stat.wins }}</span>
                                                 </td>
-                                                <td>{{ stat.games_played }}</td>
-                                                <td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-danger">{{ stat.losses }}</span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary">{{ stat.draws }}</span>
+                                                </td>
+                                                <td class="text-center">{{ stat.games_played }}</td>
+                                                <td class="text-center">
                                                     {% if stat.games_played > 0 %}
-                                                        {{ "%.1f"|format(stat.wins / stat.games_played * 100) }}%
+                                                        <div class="progress" style="height: 20px; min-width: 80px;">
+                                                            <div class="progress-bar bg-success" style="width: {{ "%.1f"|format(stat.wins / stat.games_played * 100) }}%;">
+                                                                {{ "%.1f"|format(stat.wins / stat.games_played * 100) }}%
+                                                            </div>
+                                                        </div>
                                                     {% else %}
-                                                        0%
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if stat.opponents %}
+                                                        <button class="btn btn-sm btn-outline-info" type="button"
+                                                                data-bs-toggle="collapse"
+                                                                data-bs-target="#games-{{ stat.team.id }}">
+                                                            <i class="fas fa-history"></i> {{ stat.opponents|length }} ігор
+                                                        </button>
+                                                    {% else %}
+                                                        <span class="text-muted">Ігор немає</span>
                                                     {% endif %}
                                                 </td>
                                             </tr>
+                                            {% if stat.opponents %}
+                                            <tr class="collapse" id="games-{{ stat.team.id }}">
+                                                <td colspan="9" class="p-0">
+                                                    <div class="p-3 bg-light">
+                                                        <h6 class="mb-2"><i class="fas fa-gamepad"></i> Історія ігор — {{ stat.team.name }}</h6>
+                                                        <table class="table table-sm table-bordered mb-0">
+                                                            <thead>
+                                                                <tr class="table-secondary">
+                                                                    <th>Проти</th>
+                                                                    <th class="text-center">Рахунок</th>
+                                                                    <th class="text-center">Результат</th>
+                                                                    <th>Дата</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for opp in stat.opponents %}
+                                                                <tr>
+                                                                    <td>{{ opp.opponent_name }}</td>
+                                                                    <td class="text-center">
+                                                                        <strong>{{ opp.my_score }}</strong> : {{ opp.opp_score }}
+                                                                    </td>
+                                                                    <td class="text-center">
+                                                                        {% if opp.result == "Перемога" %}
+                                                                            <span class="badge bg-success">{{ opp.result }}</span>
+                                                                        {% elif opp.result == "Поразка" %}
+                                                                            <span class="badge bg-danger">{{ opp.result }}</span>
+                                                                        {% else %}
+                                                                            <span class="badge bg-secondary">{{ opp.result }}</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td><small>{{ opp.played_at }}</small></td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
                                             {% endfor %}
                                         </tbody>
                                     </table>
@@ -790,6 +872,170 @@
                                     <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
                                     <h5 class="text-muted">Статистика недоступна</h5>
                                     <p class="text-muted">Зіграйте кілька ігор щоб побачити статистику</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Турнірна сітка -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-sitemap"></i> Турнірна сітка (Плейоф)</h5>
+                            <div>
+                                {% if bracket_rounds %}
+                                    <form method="post" action="/admin/tournament/reset" style="display: inline;"
+                                          onsubmit="return confirm('Скинути турнірну сітку? Всі дані плейофу будуть видалені.');">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="fas fa-undo"></i> Скинути
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="/admin/tournament/generate" style="display: inline;"
+                                      onsubmit="return confirm('Згенерувати нову турнірну сітку? Поточна сітка буде замінена.');">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-magic"></i> Згенерувати сітку
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if bracket_rounds %}
+                                <div class="tournament-bracket-container">
+                                    <div class="tournament-bracket d-flex align-items-start overflow-auto pb-3">
+                                        {% for round_num in range(1, total_bracket_rounds + 1) %}
+                                        <div class="bracket-round me-4" style="min-width: 260px;">
+                                            <h6 class="text-center mb-3">
+                                                <span class="badge bg-dark px-3 py-2">
+                                                    {{ round_names.get(round_num, "Раунд " ~ round_num) }}
+                                                </span>
+                                            </h6>
+                                            {% if round_num in bracket_rounds %}
+                                                {% for match in bracket_rounds[round_num] %}
+                                                <div class="bracket-match card mb-3 shadow-sm
+                                                    {% if match.is_completed %}border-success{% else %}border-warning{% endif %}">
+                                                    <div class="card-body p-2">
+                                                        <!-- Команда 1 -->
+                                                        <div class="d-flex justify-content-between align-items-center p-2 rounded mb-1
+                                                            {% if match.is_completed and match.winner_id == match.team1_id %}bg-success bg-opacity-10 border border-success{% elif match.team1_id %}bg-light{% else %}bg-light text-muted{% endif %}">
+                                                            <span class="{% if match.is_completed and match.winner_id == match.team1_id %}fw-bold text-success{% endif %}">
+                                                                {% if match.team1 %}
+                                                                    {{ match.team1.name }}
+                                                                {% else %}
+                                                                    <em class="text-muted">Очікується...</em>
+                                                                {% endif %}
+                                                            </span>
+                                                            <span class="badge {% if match.is_completed and match.winner_id == match.team1_id %}bg-success{% else %}bg-secondary{% endif %}">
+                                                                {{ match.team1_score }}
+                                                            </span>
+                                                        </div>
+                                                        <!-- VS -->
+                                                        <div class="text-center my-1">
+                                                            <small class="text-muted">vs</small>
+                                                        </div>
+                                                        <!-- Команда 2 -->
+                                                        <div class="d-flex justify-content-between align-items-center p-2 rounded mb-1
+                                                            {% if match.is_completed and match.winner_id == match.team2_id %}bg-success bg-opacity-10 border border-success{% elif match.team2_id %}bg-light{% else %}bg-light text-muted{% endif %}">
+                                                            <span class="{% if match.is_completed and match.winner_id == match.team2_id %}fw-bold text-success{% endif %}">
+                                                                {% if match.team2 %}
+                                                                    {{ match.team2.name }}
+                                                                {% else %}
+                                                                    <em class="text-muted">Очікується...</em>
+                                                                {% endif %}
+                                                            </span>
+                                                            <span class="badge {% if match.is_completed and match.winner_id == match.team2_id %}bg-success{% else %}bg-secondary{% endif %}">
+                                                                {{ match.team2_score }}
+                                                            </span>
+                                                        </div>
+
+                                                        <!-- Кнопка запису результату -->
+                                                        {% if not match.is_completed and match.team1_id and match.team2_id %}
+                                                        <div class="text-center mt-2">
+                                                            <button class="btn btn-sm btn-warning w-100"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#matchResultModal-{{ match.id }}">
+                                                                <i class="fas fa-edit"></i> Записати результат
+                                                            </button>
+                                                        </div>
+                                                        {% elif match.is_completed %}
+                                                        <div class="text-center mt-1">
+                                                            <small class="text-success"><i class="fas fa-check-circle"></i> Завершено</small>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+
+                                                <!-- Модальне вікно для запису результату матчу -->
+                                                {% if not match.is_completed and match.team1_id and match.team2_id %}
+                                                <div class="modal fade" id="matchResultModal-{{ match.id }}" tabindex="-1">
+                                                    <div class="modal-dialog modal-sm">
+                                                        <div class="modal-content">
+                                                            <form method="post" action="/admin/tournament/match/{{ match.id }}/result">
+                                                                <div class="modal-header">
+                                                                    <h6 class="modal-title">Результат матчу</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">{{ match.team1.name }}</label>
+                                                                        <input type="number" step="0.5" min="0" class="form-control"
+                                                                               name="team1_score" value="0">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">{{ match.team2.name }}</label>
+                                                                        <input type="number" step="0.5" min="0" class="form-control"
+                                                                               name="team2_score" value="0">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Переможець</label>
+                                                                        <select class="form-select" name="winner_team_id" required>
+                                                                            <option value="{{ match.team1_id }}">{{ match.team1.name }}</option>
+                                                                            <option value="{{ match.team2_id }}">{{ match.team2.name }}</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Скасувати</button>
+                                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                                        <i class="fas fa-check"></i> Зберегти
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+
+                                        <!-- Переможець турніру -->
+                                        {% if bracket_rounds and total_bracket_rounds in bracket_rounds %}
+                                            {% set final_match = bracket_rounds[total_bracket_rounds][0] if bracket_rounds[total_bracket_rounds] else None %}
+                                            {% if final_match and final_match.is_completed and final_match.winner %}
+                                            <div class="bracket-round ms-4" style="min-width: 220px;">
+                                                <h6 class="text-center mb-3">
+                                                    <span class="badge bg-warning text-dark px-3 py-2">
+                                                        🏆 Чемпіон
+                                                    </span>
+                                                </h6>
+                                                <div class="card border-warning shadow">
+                                                    <div class="card-body text-center p-3">
+                                                        <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                                                        <h5 class="text-warning mb-0">{{ final_match.winner.name }}</h5>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-sitemap fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">Турнірна сітка ще не створена</h5>
+                                    <p class="text-muted">Натисніть "Згенерувати сітку" щоб автоматично створити турнірну таблицю на основі зареєстрованих команд</p>
                                 </div>
                             {% endif %}
                         </div>

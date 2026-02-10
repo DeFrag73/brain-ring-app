@@ -17,6 +17,8 @@ from database import get_db
 from sqlalchemy import func
 from models import DifficultyLevel
 
+import math
+
 def admin_redirect(section: str = "questions", extra_params: dict = None) -> RedirectResponse:
     """Створює RedirectResponse на /admin з параметром секції"""
     params = {"section": section}
@@ -204,14 +206,86 @@ async def admin_panel(
     team_stats = []
     for team in teams:
         wins = db.query(models.GameResult).filter(models.GameResult.winner_id == team.id).count()
-        total_score = db.query(models.GameResult).filter(
+        games_played = db.query(models.GameResult).filter(
             (models.GameResult.team1_id == team.id) | (models.GameResult.team2_id == team.id)
         ).count()
+
+        # Рахуємо загальні бали
+        total_points = 0
+        team_games = db.query(models.GameResult).filter(
+            (models.GameResult.team1_id == team.id) | (models.GameResult.team2_id == team.id)
+        ).all()
+        losses = 0
+        draws = 0
+        opponents_info = []
+        for game in team_games:
+            if game.team1_id == team.id:
+                total_points += game.team1_score or 0
+                opp = game.team2
+                my_score = game.team1_score
+                opp_score = game.team2_score
+            else:
+                total_points += game.team2_score or 0
+                opp = game.team1
+                my_score = game.team2_score
+                opp_score = game.team1_score
+
+            if game.winner_id == team.id:
+                result = "Перемога"
+            elif game.winner_id is None:
+                draws += 1
+                result = "Нічия"
+            else:
+                losses += 1
+                result = "Поразка"
+
+            opponents_info.append({
+                "opponent_name": opp.name if opp else "?",
+                "my_score": my_score,
+                "opp_score": opp_score,
+                "result": result,
+                "played_at": game.played_at.strftime("%d.%m.%Y %H:%M") if game.played_at else ""
+            })
+
         team_stats.append({
             'team': team,
             'wins': wins,
-            'games_played': total_score
+            'losses': losses,
+            'draws': draws,
+            'games_played': games_played,
+            'total_points': total_points,
+            'opponents': opponents_info
         })
+
+    # Сортуємо за перемогами, потім за балами
+    team_stats.sort(key=lambda x: (-x['wins'], -x['total_points']))
+
+    # Турнірна сітка
+    bracket_matches = db.query(models.TournamentBracket).order_by(
+        models.TournamentBracket.round_number,
+        models.TournamentBracket.match_number
+    ).all()
+
+    bracket_rounds = {}
+    for match in bracket_matches:
+        r = match.round_number
+        if r not in bracket_rounds:
+            bracket_rounds[r] = []
+        bracket_rounds[r].append(match)
+
+    # Визначаємо назви раундів
+    total_bracket_rounds = max(bracket_rounds.keys()) if bracket_rounds else 0
+    round_names = {}
+    if total_bracket_rounds > 0:
+        round_names[total_bracket_rounds] = "Фінал"
+        if total_bracket_rounds > 1:
+            round_names[total_bracket_rounds - 1] = "Півфінал"
+        if total_bracket_rounds > 2:
+            round_names[total_bracket_rounds - 2] = "Чвертьфінал"
+        if total_bracket_rounds > 3:
+            round_names[total_bracket_rounds - 3] = "1/8 фіналу"
+        for i in range(1, total_bracket_rounds - 3):
+            round_names[i] = f"Раунд {i}"
 
     # Статистика по складності питань
     difficulty_stats = {}
@@ -237,7 +311,10 @@ async def admin_panel(
         "team_stats": team_stats,
         "difficulty_stats": difficulty_stats,
         "difficulty_levels": [(level.value, DifficultyLevel.get_display_name(level)) for level in DifficultyLevel],
-        "current_sort": {"by": sort_by, "order": sort_order}
+        "current_sort": {"by": sort_by, "order": sort_order},
+        "bracket_rounds": bracket_rounds,
+        "round_names": round_names,
+        "total_bracket_rounds": total_bracket_rounds
     })
 
 
@@ -973,6 +1050,246 @@ async def search_questions(
             "used_status": used_status
         }
     })
+
+# ============= API ДЛЯ ТУРНІРНОЇ СІТКИ =============
+
+@app.get("/api/tournament-bracket")
+async def get_tournament_bracket(db: Session = Depends(get_db)):
+    """Отримати поточну турнірну сітку"""
+    matches = db.query(models.TournamentBracket).order_by(
+        models.TournamentBracket.round_number,
+        models.TournamentBracket.match_number
+    ).all()
+
+    rounds = {}
+    for match in matches:
+        r = match.round_number
+        if r not in rounds:
+            rounds[r] = []
+        rounds[r].append({
+            "id": match.id,
+            "match_number": match.match_number,
+            "team1": {"id": match.team1_id, "name": match.team1.name if match.team1 else "TBD"},
+            "team2": {"id": match.team2_id, "name": match.team2.name if match.team2 else "TBD"},
+            "team1_score": match.team1_score,
+            "team2_score": match.team2_score,
+            "winner": {"id": match.winner_id, "name": match.winner.name if match.winner else None},
+            "is_completed": match.is_completed
+        })
+
+    return JSONResponse({"rounds": rounds})
+
+
+@app.post("/admin/tournament/generate")
+async def generate_tournament_bracket(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Автоматично згенерувати турнірну сітку на основі команд"""
+    teams = db.query(models.Team).all()
+    if len(teams) < 2:
+        return JSONResponse({"status": "error", "message": "Потрібно мінімум 2 команди"}, status_code=400)
+
+    # Видаляємо стару сітку
+    db.query(models.TournamentBracket).delete()
+    db.commit()
+
+    # Визначаємо кількість раундів (найближчий ступінь двійки)
+    num_teams = len(teams)
+    bracket_size = 1
+    while bracket_size < num_teams:
+        bracket_size *= 2
+
+    total_rounds = int(math.log2(bracket_size))
+    first_round_matches = bracket_size // 2
+
+    # Створюємо порожні слоти для всіх раундів
+    for round_num in range(1, total_rounds + 1):
+        matches_in_round = bracket_size // (2 ** round_num)
+        for match_num in range(1, matches_in_round + 1):
+            match = models.TournamentBracket(
+                round_number=round_num,
+                match_number=match_num
+            )
+            db.add(match)
+
+    db.commit()
+
+    # Заповнюємо перший раунд командами
+    import random
+    shuffled_teams = list(teams)
+    random.shuffle(shuffled_teams)
+
+    first_round = db.query(models.TournamentBracket).filter(
+        models.TournamentBracket.round_number == 1
+    ).order_by(models.TournamentBracket.match_number).all()
+
+    team_index = 0
+    byes = []  # Команди, що проходять без гри (bye)
+
+    for match in first_round:
+        if team_index < len(shuffled_teams):
+            match.team1_id = shuffled_teams[team_index].id
+            team_index += 1
+        if team_index < len(shuffled_teams):
+            match.team2_id = shuffled_teams[team_index].id
+            team_index += 1
+
+        # Якщо в матчі тільки одна команда — автоматична перемога (bye)
+        if match.team1_id and not match.team2_id:
+            match.winner_id = match.team1_id
+            match.is_completed = True
+            byes.append((match.round_number, match.match_number, match.winner_id))
+        elif match.team2_id and not match.team1_id:
+            match.winner_id = match.team2_id
+            match.is_completed = True
+            byes.append((match.round_number, match.match_number, match.winner_id))
+
+    db.commit()
+
+    # Просуваємо bye-переможців на наступний раунд
+    _advance_winners(db, 1)
+
+    return admin_redirect("stats")
+
+
+def _advance_winners(db: Session, from_round: int):
+    """Просунути переможців поточного раунду на наступний"""
+    current_matches = db.query(models.TournamentBracket).filter(
+        models.TournamentBracket.round_number == from_round
+    ).order_by(models.TournamentBracket.match_number).all()
+
+    next_round_matches = db.query(models.TournamentBracket).filter(
+        models.TournamentBracket.round_number == from_round + 1
+    ).order_by(models.TournamentBracket.match_number).all()
+
+    if not next_round_matches:
+        return
+
+    for i, match in enumerate(current_matches):
+        if match.winner_id:
+            next_match_index = i // 2
+            if next_match_index < len(next_round_matches):
+                next_match = next_round_matches[next_match_index]
+                if i % 2 == 0:
+                    next_match.team1_id = match.winner_id
+                else:
+                    next_match.team2_id = match.winner_id
+
+                # Якщо обидва суперники відомі і один — bye
+                if next_match.team1_id and not next_match.team2_id:
+                    pass  # Чекаємо другого
+                elif next_match.team2_id and not next_match.team1_id:
+                    pass
+                # Автоматичне bye якщо тільки одна команда після заповнення
+    db.commit()
+
+
+@app.post("/admin/tournament/match/{match_id}/result")
+async def set_tournament_match_result(
+        match_id: int,
+        winner_team_id: int = Form(...),
+        team1_score: float = Form(0),
+        team2_score: float = Form(0),
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Записати результат матчу в турнірній сітці"""
+    match = db.query(models.TournamentBracket).filter(
+        models.TournamentBracket.id == match_id
+    ).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Матч не знайдено")
+
+    match.team1_score = team1_score
+    match.team2_score = team2_score
+    match.winner_id = winner_team_id
+    match.is_completed = True
+    db.commit()
+
+    # Просуваємо переможця на наступний раунд
+    _advance_winners(db, match.round_number)
+
+    return admin_redirect("stats")
+
+
+@app.post("/admin/tournament/reset")
+async def reset_tournament_bracket(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    """Скинути турнірну сітку"""
+    db.query(models.TournamentBracket).delete()
+    db.commit()
+    return admin_redirect("stats")
+
+
+@app.get("/api/team-stats")
+async def get_team_stats_api(db: Session = Depends(get_db)):
+    """Розширена статистика команд"""
+    teams = db.query(models.Team).all()
+    stats = []
+
+    for team in teams:
+        games = db.query(models.GameResult).filter(
+            (models.GameResult.team1_id == team.id) | (models.GameResult.team2_id == team.id)
+        ).all()
+
+        wins = 0
+        losses = 0
+        draws = 0
+        total_points = 0
+        opponents = []
+
+        for game in games:
+            if game.team1_id == team.id:
+                total_points += game.team1_score or 0
+                opponent = game.team2
+                my_score = game.team1_score
+                opp_score = game.team2_score
+            else:
+                total_points += game.team2_score or 0
+                opponent = game.team1
+                my_score = game.team2_score
+                opp_score = game.team1_score
+
+            if game.winner_id == team.id:
+                wins += 1
+                result = "win"
+            elif game.winner_id is None:
+                draws += 1
+                result = "draw"
+            else:
+                losses += 1
+                result = "loss"
+
+            opponents.append({
+                "opponent_name": opponent.name if opponent else "Невідомо",
+                "my_score": my_score,
+                "opponent_score": opp_score,
+                "result": result,
+                "played_at": game.played_at.strftime("%d.%m.%Y %H:%M") if game.played_at else ""
+            })
+
+        stats.append({
+            "id": team.id,
+            "name": team.name,
+            "captain": team.captain,
+            "wins": wins,
+            "losses": losses,
+            "draws": draws,
+            "games_played": len(games),
+            "total_points": total_points,
+            "opponents": opponents,
+            "win_rate": round((wins / len(games) * 100) if games else 0, 1)
+        })
+
+    # Сортуємо за перемогами, потім за балами
+    stats.sort(key=lambda x: (-x["wins"], -x["total_points"]))
+
+    return JSONResponse({"team_stats": stats})
+
 
 # ============= ГОЛОВНА СТОРІНКА =============
 

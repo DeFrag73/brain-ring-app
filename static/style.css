@@ -697,3 +697,73 @@ main.col-md-9.ms-sm-auto.col-lg-10 {
         font-size: 0.8rem;
     }
 }
+
+/* ====== Турнірна сітка (Bracket) ====== */
+.tournament-bracket-container {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+
+.tournament-bracket {
+    min-width: max-content;
+}
+
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    flex-shrink: 0;
+}
+
+.bracket-match {
+    border-width: 2px !important;
+    border-radius: 0.75rem !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bracket-match:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.bracket-match .badge {
+    min-width: 2.5rem;
+    font-size: 0.85rem;
+}
+
+/* Підсвітка переможця в сітці */
+.bracket-match .bg-success.bg-opacity-10 {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* Вирівнювання раундів у сітці */
+.bracket-round:nth-child(2) {
+    padding-top: 1.5rem;
+}
+
+.bracket-round:nth-child(3) {
+    padding-top: 4rem;
+}
+
+.bracket-round:nth-child(4) {
+    padding-top: 8rem;
+}
+
+.bracket-round:nth-child(5) {
+    padding-top: 14rem;
+}
+
+/* Адаптивність для мобільних */
+@media (max-width: 768px) {
+    .tournament-bracket {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .bracket-round {
+        min-width: 100% !important;
+        margin-right: 0 !important;
+        margin-bottom: 1.5rem;
+        padding-top: 0 !important;
+    }
+}
