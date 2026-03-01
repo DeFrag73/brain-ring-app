@@ -614,11 +614,16 @@
                             <h5><i class="fas fa-handshake"></i> Вибір команд для раунду</h5>
                         </div>
                         <div class="card-body">
-                            <form method="post" action="/admin/game/set-teams">
+                            <!-- Повідомлення про помилку -->
+                            <div id="team-error-alert" class="alert alert-danger d-none" role="alert">
+                                <i class="fas fa-exclamation-triangle"></i> <strong>Помилка!</strong> Команда не може грати сама з собою. Будь ласка, оберіть різні команди.
+                            </div>
+
+                            <form id="set-teams-form" method="post" action="/admin/game/set-teams">
                                 <div class="row">
                                     <div class="col-md-5">
                                         <label for="team1_id" class="form-label">Перша команда</label>
-                                        <select class="form-select" name="team1_id" required>
+                                        <select id="team1_id" class="form-select" name="team1_id" required>
                                             <option value="">Оберіть команду...</option>
                                             {% for team in teams %}
                                                 <option value="{{ team.id }}"
@@ -636,7 +641,7 @@
                                     </div>
                                     <div class="col-md-5">
                                         <label for="team2_id" class="form-label">Друга команда</label>
-                                        <select class="form-select" name="team2_id" required>
+                                        <select id="team2_id" class="form-select" name="team2_id" required>
                                             <option value="">Оберіть команду...</option>
                                             {% for team in teams %}
                                                 <option value="{{ team.id }}"

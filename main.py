@@ -537,6 +537,10 @@ async def set_current_teams(
         db: Session = Depends(get_db)
 ):
     """Встановлення команд для поточного раунду"""
+    # Валідація: перевірка, що команди не однакові
+    if team1_id == team2_id:
+        return admin_redirect("game", extra_params={"error": "same_teams"})
+
     current_game = db.query(models.CurrentGame).first()
     if not current_game:
         current_game = models.CurrentGame()

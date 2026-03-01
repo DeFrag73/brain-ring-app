@@ -149,6 +149,15 @@ function initializeEventListeners() {
 
     // Обробка клавіатурних скорочень
     document.addEventListener('keydown', handleKeyboardShortcuts);
+
+    // Валідація форми вибору команд
+    const setTeamsForm = document.getElementById('set-teams-form');
+    if (setTeamsForm) {
+        setTeamsForm.addEventListener('submit', validateTeamsSelection);
+    }
+
+    // Перевірка помилки з URL параметрів
+    checkTeamsError();
 }
 
 // Обробка AJAX форм
@@ -1114,5 +1123,89 @@ window.BrainRingAdmin = {
     AdminPanel,
     BackupManager
 };
+
+// Функція валідації вибору команд
+function validateTeamsSelection(e) {
+    const team1Select = document.getElementById('team1_id');
+    const team2Select = document.getElementById('team2_id');
+    const errorAlert = document.getElementById('team-error-alert');
+
+    const team1Id = team1Select.value;
+    const team2Id = team2Select.value;
+
+    // Перевірка, що обрано дві різні команди
+    if (team1Id && team2Id && team1Id === team2Id) {
+        e.preventDefault(); // Запобігаємо відправці форми
+
+        // Показуємо повідомлення про помилку
+        errorAlert.classList.remove('d-none');
+
+        // Додаємо червоне виділення до select елементів
+        team1Select.classList.add('is-invalid');
+        team2Select.classList.add('is-invalid');
+
+        // Прокручуємо до помилки
+        errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Показуємо системне сповіщення
+        showNotification('Команда не може грати сама з собою', 'error');
+
+        return false;
+    }
+
+    // Ховаємо повідомлення про помилку якщо все ок
+    errorAlert.classList.add('d-none');
+    team1Select.classList.remove('is-invalid');
+    team2Select.classList.remove('is-invalid');
+
+    return true;
+}
+
+// Функція для перевірки помилки з URL параметрів
+function checkTeamsError() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+
+    if (error === 'same_teams') {
+        const errorAlert = document.getElementById('team-error-alert');
+        const team1Select = document.getElementById('team1_id');
+        const team2Select = document.getElementById('team2_id');
+
+        if (errorAlert) {
+            // Показуємо помилку
+            errorAlert.classList.remove('d-none');
+
+            if (team1Select) team1Select.classList.add('is-invalid');
+            if (team2Select) team2Select.classList.add('is-invalid');
+
+            // Прокручуємо до секції гри
+            showSection('game');
+
+            // Показуємо системне сповіщення
+            setTimeout(() => {
+                showNotification('Команда не може грати сама з собою', 'error');
+                errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 500);
+        }
+    }
+}
+
+// Додаємо слухачів на зміну select для автоматичного приховування помилки
+document.addEventListener('DOMContentLoaded', function() {
+    const team1Select = document.getElementById('team1_id');
+    const team2Select = document.getElementById('team2_id');
+    const errorAlert = document.getElementById('team-error-alert');
+
+    if (team1Select && team2Select && errorAlert) {
+        const hideError = function() {
+            errorAlert.classList.add('d-none');
+            team1Select.classList.remove('is-invalid');
+            team2Select.classList.remove('is-invalid');
+        };
+
+        team1Select.addEventListener('change', hideError);
+        team2Select.addEventListener('change', hideError);
+    }
+});
 
 console.log('Скрипт адмін панелі завантажено успішно');
