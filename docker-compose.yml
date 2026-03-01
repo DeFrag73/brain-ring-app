@@ -1,0 +1,8 @@
+services:
+  brainring:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./brainring.db:/app/brainring.db
+    restart: unless-stopped
