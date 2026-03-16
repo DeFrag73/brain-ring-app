@@ -1,0 +1,13 @@
+/.idea
+/.venv
+/requirements.txt
+__pycache__/
+*.pyc
+*.cpython-314.pyc
+*.pyo
+
+/brainring.db
+/backup_sqllite.ps1
+/BackupSQLlite.sh
+/migration_add_difficulty.py
+/.env
