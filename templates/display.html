@@ -7,6 +7,7 @@
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -102,10 +103,20 @@
         }
 
         .question-number {
-            font-size: 1.5rem;
+            /* Використовуємо clamp для адаптивного шрифту: мінімум 1.2rem, ідеально 2.5vw, максимум 1.8rem */
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem);
             color: #667eea;
             font-weight: bold;
             margin-bottom: 1rem;
+
+            /* Забороняємо перенесення тексту на новий рядок */
+            white-space: nowrap;
+
+            /* Якщо текст все ж таки більший за контейнер, він буде акуратно обрізатися з трьома крапками, а не ламати дизайн */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            display: block;
         }
 
         .question-text {
@@ -160,6 +171,82 @@
         .connection-status.disconnected {
             background: rgba(220, 53, 69, 0.8);
             color: white;
+        }
+
+        /* --- СТИЛІ ДЛЯ СИСТЕМИ КНОПОК --- */
+        .buzzer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .buzzer-content {
+            text-align: center;
+            padding: 4rem 6rem;
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 5px solid white;
+            transform: scale(0.9);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .buzzer-content h2 {
+            font-size: 5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .buzzer-team-name {
+            font-size: 6rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 3px 3px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Стиль для фальстарту */
+        .falsestart {
+            background: rgba(220, 53, 69, 0.2);
+            border-color: #dc3545;
+            box-shadow: 0 0 80px rgba(220, 53, 69, 0.8);
+            animation: flashRed 0.8s infinite alternate;
+        }
+        .falsestart h2 { color: #ff6b6b; }
+
+        /* Стиль для правильного натискання */
+        .answering {
+            background: rgba(40, 167, 69, 0.2);
+            border-color: #28a745;
+            box-shadow: 0 0 80px rgba(40, 167, 69, 0.8);
+        }
+        .answering h2 { color: #51cf66; }
+
+        @keyframes popIn { to { transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes flashRed {
+            from { background: rgba(220, 53, 69, 0.1); }
+            to { background: rgba(220, 53, 69, 0.4); }
+        }
+
+        /* Покращена анімація нарахування балів */
+        .score-added {
+            animation: scoreAddedAnim 2s ease-out;
+        }
+        @keyframes scoreAddedAnim {
+            0% { transform: scale(1); color: #ffd700; }
+            15% { transform: scale(1.6); color: #51cf66; text-shadow: 0 0 30px #51cf66; }
+            50% { transform: scale(1.4); color: #51cf66; text-shadow: 0 0 20px #51cf66; }
+            100% { transform: scale(1); color: #ffd700; }
         }
 
         @keyframes fadeInUp {
@@ -329,6 +416,12 @@
             <h3>Очікування початку гри</h3>
             <p class="lead">Адміністратор готує команди для змагання</p>
         </div>
+        <div id="buzzer-overlay" class="buzzer-overlay" style="display: none;">
+            <div class="buzzer-content">
+                <h2 id="buzzer-action-text">ВІДПОВІДАЄ</h2>
+                <div id="buzzer-team-name" class="buzzer-team-name">Команда 1</div>
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript для WebSocket з'єднання -->
@@ -336,6 +429,7 @@
         let socket;
         let reconnectInterval;
         let isReconnecting = false;
+        let buzzerState = 'IDLE';
 
         // Елементи DOM
         const connectionStatus = document.getElementById('connection-status');
@@ -379,6 +473,8 @@
                         const data = JSON.parse(event.data);
                         if (data.type === 'display_update') {
                             updateDisplay(data);
+                        } else if (data.type === 'buzzer_event') {
+                            handleBuzzerEvent(data.action);
                         }
                     } catch (error) {
                         console.error('Помилка обробки повідомлення:', error);
@@ -472,31 +568,30 @@
 
         // Оновити команди та рахунок
         function updateTeams(data) {
-            // Оновлення назв команд з анімацією
             if (team1Name.textContent !== data.team1) {
                 team1Name.textContent = data.team1;
                 team1Card.classList.add('slide-in-left');
                 setTimeout(() => team1Card.classList.remove('slide-in-left'), 500);
             }
-
             if (team2Name.textContent !== data.team2) {
                 team2Name.textContent = data.team2;
                 team2Card.classList.add('slide-in-right');
                 setTimeout(() => team2Card.classList.remove('slide-in-right'), 500);
             }
 
-            // Оновлення рахунку з анімацією
+            // Оновлення рахунку з покращеною анімацією
             if (team1Score.textContent !== data.team1_score.toString()) {
                 team1Score.textContent = data.team1_score;
-                team1Score.classList.add('score-animation');
-                setTimeout(() => team1Score.classList.remove('score-animation'), 500);
-                playScoreSound();
+                team1Score.classList.remove('score-added');
+                void team1Score.offsetWidth; // Тригер перезапуску анімації
+                team1Score.classList.add('score-added');
+                playScoreSound(); // Переможний звук балів
             }
-
             if (team2Score.textContent !== data.team2_score.toString()) {
                 team2Score.textContent = data.team2_score;
-                team2Score.classList.add('score-animation');
-                setTimeout(() => team2Score.classList.remove('score-animation'), 500);
+                team2Score.classList.remove('score-added');
+                void team2Score.offsetWidth;
+                team2Score.classList.add('score-added');
                 playScoreSound();
             }
         }
@@ -523,29 +618,119 @@
             waitingSection.style.display = 'block';
         }
 
-        // Звукові ефекти
+        // --- ЛОГІКА ВІДОБРАЖЕННЯ КНОПОК ---
+        function handleBuzzerEvent(action) {
+            const overlay = document.getElementById('buzzer-overlay');
+            const actionText = document.getElementById('buzzer-action-text');
+            const teamNameEl = document.getElementById('buzzer-team-name');
+            const content = overlay.querySelector('.buzzer-content');
+
+            if (action === 'start') {
+                buzzerState = 'ACTIVE';
+                overlay.style.display = 'none';
+                playStartSound(); // Звук початку відліку
+            } else if (action === 'reset') {
+                buzzerState = 'IDLE';
+                overlay.style.display = 'none';
+            } else if (action === 'team1' || action === 'team2') {
+                if (buzzerState === 'LOCKED') return; // Хтось вже натиснув
+
+                const isFalseStart = (buzzerState === 'IDLE');
+                buzzerState = 'LOCKED'; // Блокуємо систему
+
+                // Отримуємо поточну назву команди з екрану
+                const teamName = action === 'team1' ?
+                    document.getElementById('team1-name').textContent :
+                    document.getElementById('team2-name').textContent;
+
+                teamNameEl.textContent = teamName;
+                content.className = 'buzzer-content'; // Скидаємо класи
+
+                if (isFalseStart) {
+                    actionText.textContent = 'ФАЛЬСТАРТ!';
+                    content.classList.add('falsestart');
+                    playFalseStartSound(); // Звук помилки
+                } else {
+                    actionText.textContent = 'ВІДПОВІДАЄ:';
+                    content.classList.add('answering');
+                    playBuzzerSound(); // Класичний звук "Дзінь"
+                }
+
+                overlay.style.display = 'flex'; // Показуємо оверлей
+            }
+        }
+
+        // --- ГЕНЕРАТОР ЗВУКІВ (Не потребує завантаження MP3 файлів) ---
+        function playStartSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+            } catch (e) {}
+        }
+
+        function playBuzzerSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(450, ctx.currentTime);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6);
+            } catch (e) {}
+        }
+
+        function playFalseStartSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.6);
+            } catch (e) {}
+        }
+
+        // Заміна існуючої функції
         function playScoreSound() {
             try {
-                // Створення простого звукового сигналу
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc1 = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
+                osc1.type = 'sine'; osc2.type = 'triangle';
 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
+                // Переможний мажорний акорд з арпеджіо
+                osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                osc2.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+                osc1.frequency.setValueAtTime(783.99, ctx.currentTime + 0.15); // G5
+                osc2.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3); // C6
 
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
 
-                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.01);
-                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
-
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (error) {
-                console.log('Звук недоступний:', error);
-            }
+                osc1.start(ctx.currentTime); osc2.start(ctx.currentTime);
+                osc1.stop(ctx.currentTime + 1.5); osc2.stop(ctx.currentTime + 1.5);
+            } catch (error) { console.log('Звук недоступний:', error); }
         }
 
         // Ініціалізація при завантаженні сторінки
