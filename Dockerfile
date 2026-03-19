@@ -1,5 +1,5 @@
 # Базовий образ Python
-FROM python:3.9-slim
+FROM python:3.10.0-slim
 
 # Встановлення робочої директорії
 WORKDIR /app

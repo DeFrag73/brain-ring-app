@@ -7,6 +7,7 @@ let editModal;
 // Ініціалізація при завантаженні сторінки
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Адмін панель завантажена');
+    BuzzerSystem.init();
 
     // Ініціалізація Bootstrap модалів
     const editModalElement = document.getElementById('editQuestionModal');
@@ -1189,6 +1190,151 @@ function checkTeamsError() {
         }
     }
 }
+
+// Мережева система управління ігровими кнопками (WebSockets)
+const BuzzerSystem = {
+    state: 'IDLE',
+    ws: null,
+
+    // Налаштування клавіш (Комп'ютер з кнопками слухатиме їх)
+    keys: {
+        team1: '1',
+        team2: '2',
+        start: ' ',
+        reset: 'escape'
+    },
+
+    init: function() {
+        // Підключаємося до WebSocket сервера
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.ws = new WebSocket(`${protocol}//${window.location.host}/ws/buzzer`);
+
+        // Коли отримуємо команду від сервера (від будь-якого пристрою)
+        this.ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleServerEvent(data);
+        };
+
+        this.ws.onclose = () => {
+            console.log('Відключено від системи кнопок. Перепідключення через 3 сек...');
+            setTimeout(() => this.init(), 3000);
+        };
+
+        // Слухаємо фізичні кнопки
+        document.addEventListener('keydown', this.handleKeyPress.bind(this));
+        console.log("Брейн-система (WebSocket) ініціалізована");
+    },
+
+    handleKeyPress: function(e) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+        if (document.getElementById('game-section').style.display === 'none') return;
+
+        const key = e.key.toLowerCase();
+        let action = null;
+
+        if (key === this.keys.start) {
+            e.preventDefault();
+            action = 'start';
+        } else if (key === this.keys.reset) {
+            action = 'reset';
+        } else if (key === this.keys.team1) {
+            action = 'team1';
+        } else if (key === this.keys.team2) {
+            action = 'team2';
+        }
+
+        // Замість виконання дії локально, відправляємо її на сервер!
+        if (action) {
+            this.sendAction(action);
+        }
+    },
+
+    // Відправка події на сервер (викликається і клавіатурою, і кнопками в інтерфейсі)
+    sendAction: function(action) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ action: action }));
+        } else {
+            showNotification('Немає зв\'язку з сервером системи кнопок!', 'error');
+        }
+    },
+
+    // Розподіл подій, що прийшли від сервера
+    handleServerEvent: function(data) {
+        if (data.action === 'start') this.executeStartTimer();
+        else if (data.action === 'reset') this.executeReset();
+        else if (data.action === 'team1') this.executeTeamPress(1);
+        else if (data.action === 'team2') this.executeTeamPress(2);
+    },
+
+    // --- ФАКТИЧНЕ ВИКОНАННЯ (Зміна інтерфейсу) ---
+    executeStartTimer: function() {
+        if (this.state === 'IDLE') {
+            this.state = 'ACTIVE';
+            const btn = document.getElementById('btn-start-time');
+            if (btn) {
+                btn.className = 'btn btn-warning btn-lg w-100 shadow';
+                btn.innerHTML = '<i class="fas fa-clock"></i> ЧАС ПІШОВ...';
+            }
+        }
+    },
+
+    executeTeamPress: function(teamNum) {
+        if (this.state === 'LOCKED') return;
+
+        const container = document.getElementById(`buzzer-team${teamNum}`);
+        if (!container) return; // Якщо адмін на іншій вкладці меню
+
+        const statusText = container.querySelector('.buzzer-status');
+        const btn = document.getElementById('btn-start-time');
+
+        if (this.state === 'IDLE') {
+            // ФАЛЬСТАРТ
+            this.state = 'LOCKED';
+            container.classList.remove('bg-white');
+            container.classList.add('bg-danger', 'text-white');
+            statusText.classList.remove('text-secondary');
+            statusText.classList.add('text-white', 'fw-bold');
+            statusText.innerText = 'ФАЛЬСТАРТ!';
+
+            if (btn) btn.disabled = true;
+            showNotification(`Команда ${teamNum} - Фальстарт!`, 'error');
+
+        } else if (this.state === 'ACTIVE') {
+            // ПРАВИЛЬНА ВІДПОВІДЬ
+            this.state = 'LOCKED';
+            container.classList.remove('bg-white');
+            container.classList.add('bg-success', 'text-white');
+            statusText.classList.remove('text-secondary');
+            statusText.classList.add('text-white', 'fw-bold');
+            statusText.innerText = 'ВІДПОВІДАЄ!';
+
+            if (btn) {
+                btn.className = 'btn btn-secondary btn-lg w-100 shadow';
+                btn.innerHTML = 'Відповідь прийнята';
+            }
+        }
+    },
+
+    executeReset: function() {
+        this.state = 'IDLE';
+
+        [1, 2].forEach(teamNum => {
+            const t = document.getElementById(`buzzer-team${teamNum}`);
+            if (t) {
+                t.className = 'p-3 border rounded text-center bg-white';
+                t.querySelector('.buzzer-status').className = 'buzzer-status h5 mt-2 mb-0 text-secondary';
+                t.querySelector('.buzzer-status').innerText = 'Очікування';
+            }
+        });
+
+        const btn = document.getElementById('btn-start-time');
+        if (btn) {
+            btn.disabled = false;
+            btn.className = 'btn btn-primary btn-lg w-100 shadow';
+            btn.innerHTML = '<i class="fas fa-play"></i> ЧАС (Пробіл)';
+        }
+    }
+};
 
 // Додаємо слухачів на зміну select для автоматичного приховування помилки
 document.addEventListener('DOMContentLoaded', function() {

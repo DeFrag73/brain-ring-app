@@ -6,7 +6,7 @@ from services.auth import RequiresLoginException # Імпортуємо наш �
 import models
 import database
 # Додай auth до імпорту роутерів
-from routers import admin, questions, teams, game, display, tournament, auth
+from routers import admin, questions, teams, game, display, tournament, auth, buzzer
 
 app = FastAPI(title="Брейн-ринг", description="Додаток для проведення ігор Брейн-ринг")
 
@@ -25,6 +25,7 @@ app.include_router(teams.router)
 app.include_router(game.router)
 app.include_router(display.router)
 app.include_router(tournament.router)
+app.include_router(buzzer.router)
 
 models.Base.metadata.create_all(bind=database.engine)
 

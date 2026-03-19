@@ -664,6 +664,34 @@
                         </div>
                     </div>
 
+                    {% if current_game and current_game.current_question %}
+                    <div class="card mb-4 border-primary shadow-sm">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-comment-dots"></i> Поточне питання</h5>
+                            <span class="badge bg-light text-dark">
+                                Складність: {{ current_game.current_question.difficulty_display | default(current_game.current_question.difficulty.value) }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-title" style="line-height: 1.5; font-weight: normal;">
+                                {{ current_game.current_question.text }}
+                            </h3>
+
+                            {% if current_game.current_question.notes %}
+                            <hr>
+                            <p class="text-muted mb-0 fs-5">
+                                <i class="fas fa-check-circle text-success"></i> <strong>Відповідь / Нотатки:</strong>
+                                {{ current_game.current_question.notes }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info shadow-sm mb-4 border-start border-info border-4" role="alert">
+                        <i class="fas fa-info-circle fa-lg me-2"></i> <strong>Питання не обрано.</strong> Перейдіть у вкладку "Питання" та натисніть синю кнопку <button class="btn btn-info btn-sm mx-1 px-2 py-0" disabled><i class="fas fa-eye text-white"></i></button> біля потрібного питання, щоб воно з'явилося тут для зачитування.
+                    </div>
+                    {% endif %}
+
                     <!-- Поточний раунд -->
                     {% if current_game and current_game.team1_id and current_game.team2_id %}
                     <div class="card mb-4">
@@ -743,6 +771,35 @@
                                             <i class="fas fa-flag-checkered"></i> Завершити раунд
                                         </button>
                                     </form>
+                                    <div class="row mt-4 border-top pt-3" id="buzzer-system-panel">
+                                        <div class="col-12 text-center">
+                                            <h5 class="mb-3"><i class="fas fa-stopwatch"></i> Ігрова система (Кнопки)</h5>
+                                            <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded shadow-sm">
+                                                <div id="buzzer-team1" class="p-3 border rounded text-center bg-white" style="width: 30%;">
+                                                    <h6 class="mb-0 text-truncate">{{ current_game.team1.name }}</h6>
+                                                    <small class="text-muted">Клавіша '1'</small>
+                                                    <div class="buzzer-status h5 mt-2 mb-0 text-secondary">Очікування</div>
+                                                </div>
+
+                                                <div class="text-center" style="width: 35%;">
+                                                    <button id="btn-start-time" class="btn btn-primary btn-lg w-100 shadow" onclick="BuzzerSystem.sendAction('start')">
+                                                        <i class="fas fa-play"></i> ЧАС (Пробіл)
+                                                    </button>
+                                                    <div class="mt-3">
+                                                        <button class="btn btn-sm btn-outline-secondary" onclick="BuzzerSystem.sendAction('reset')">
+                                                            <i class="fas fa-undo"></i> Скинути (Esc)
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div id="buzzer-team2" class="p-3 border rounded text-center bg-white" style="width: 30%;">
+                                                    <h6 class="mb-0 text-truncate">{{ current_game.team2.name }}</h6>
+                                                    <small class="text-muted">Клавіша '2'</small>
+                                                    <div class="buzzer-status h5 mt-2 mb-0 text-secondary">Очікування</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
