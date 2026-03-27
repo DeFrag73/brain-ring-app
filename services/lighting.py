@@ -6,6 +6,42 @@ from tapo import ApiClient
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("LightingManager")
 
+class StubLightingManager:
+    """Заглушка для тестування без реальних ламп Tapo."""
+
+    def __init__(self):
+        self.is_connected = False
+        self._background_tasks: set[asyncio.Task] = set()
+        logger.info("🔧 Використовується ЗАГЛУШКА ламп (StubLightingManager)")
+
+    def fire_and_forget(self, coro):
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def connect(self) -> bool:
+        logger.info("🔧 [STUB] Підключення до ламп — пропущено (заглушка)")
+        self.is_connected = True
+        return True
+
+    async def set_idle(self):
+        logger.info("🔧 [STUB] Режим простою")
+
+    async def start_timer(self):
+        logger.info("🔧 [STUB] Відлік часу")
+
+    async def trigger_buzzer(self, team_id: str):
+        logger.info(f"🔧 [STUB] Кнопка команди {team_id}")
+
+    async def false_start(self, team_id: str):
+        logger.info(f"🔧 [STUB] Фальстарт команди {team_id}")
+
+    async def answer_correct(self):
+        logger.info("🔧 [STUB] Правильна відповідь")
+
+    async def answer_incorrect(self):
+        logger.info("🔧 [STUB] Неправильна відповідь")
+
 
 class LightingManager:
     def __init__(self, email: str, password: str, bulb1_ip: str, bulb2_ip: str):
@@ -79,9 +115,9 @@ class LightingManager:
         """ЧАС ПРОСТОЮ: м'яке тепле біле світло (2700K), 30%."""
         logger.info("Лампи: Режим простою")
         await self.safe_execute(lambda: self.bulb1.set_color_temperature(2700))
-        await self.safe_execute(lambda: self.bulb1.set_brightness(30))
+        await self.safe_execute(lambda: self.bulb1.set_brightness(20))
         await self.safe_execute(lambda: self.bulb2.set_color_temperature(2700))
-        await self.safe_execute(lambda: self.bulb2.set_brightness(30))
+        await self.safe_execute(lambda: self.bulb2.set_brightness(20))
 
     async def start_timer(self):
         """ЧАС ПІШОВ (Пробіл): Лампи згасають (очікування натискання)."""
@@ -115,12 +151,13 @@ class LightingManager:
                 await self.safe_execute(lambda: bulb.set_brightness(1))  # Згасає
                 await asyncio.sleep(0.2)
 
-        # Після фальстарту повертаємо у режим простою (можна змінити на set_idle)
+        # Після фальстарту повертаємо у режим простою
         await self.set_idle()
 
     async def answer_correct(self):
         """ПРАВИЛЬНА ВІДПОВІДЬ: Обидві лампи блимають яскраво-зеленим."""
         logger.info("Лампи: Правильна відповідь")
+
         await self.safe_execute(lambda: self.bulb1.set_hue_saturation(120, 100))
         await self.safe_execute(lambda: self.bulb1.set_brightness(100))
         await self.safe_execute(lambda: self.bulb2.set_hue_saturation(120, 100))
@@ -132,6 +169,7 @@ class LightingManager:
     async def answer_incorrect(self):
         """НЕПРАВИЛЬНА ВІДПОВІДЬ: Обидві лампи блимають яскраво-червоним."""
         logger.info("Лампи: Неправильна відповідь")
+
         await self.safe_execute(lambda: self.bulb1.set_hue_saturation(0, 100))
         await self.safe_execute(lambda: self.bulb1.set_brightness(100))
         await self.safe_execute(lambda: self.bulb2.set_hue_saturation(0, 100))
@@ -140,14 +178,15 @@ class LightingManager:
         await asyncio.sleep(2)
         await self.set_idle()
 
-
-# Глобальний екземпляр менеджера
-light_manager = LightingManager(
-    email=os.getenv("TAPO_EMAIL", ""),
-    password=os.getenv("TAPO_PASSWORD", ""),
-    bulb1_ip=os.getenv("TAPO_BULB1_IP", "192.168.1.50"),
-    bulb2_ip=os.getenv("TAPO_BULB2_IP", "192.168.1.51"),
-)
+if os.getenv("TAPO_STUB", "").lower() in ("1", "true", "yes"):
+    light_manager = StubLightingManager()
+else:
+    light_manager = LightingManager(
+        email=os.getenv("TAPO_EMAIL", ""),
+        password=os.getenv("TAPO_PASSWORD", ""),
+        bulb1_ip=os.getenv("TAPO_BULB1_IP", "192.168.1.50"),
+        bulb2_ip=os.getenv("TAPO_BULB2_IP", "192.168.1.51"),
+    )
 
 
 # ==========================================

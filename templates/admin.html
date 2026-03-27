@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Брейн-ринг - Адміністратор</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/all.min.css" rel="stylesheet">
     <link href="/static/style.css" rel="stylesheet">
 </head>
 <body>
@@ -781,13 +781,14 @@
                                                     const payload = { action: action };
                                                     if (team) payload.team = team;
 
-                                                    // Використовуємо об'єкт BuzzerSystem з вашого script.js
-                                                    if (window.BuzzerSystem && window.BuzzerSystem.socket) {
-                                                        window.BuzzerSystem.socket.send(JSON.stringify(payload));
-                                                    } else if (window.BuzzerSystem && window.BuzzerSystem.ws) {
-                                                        window.BuzzerSystem.ws.send(JSON.stringify(payload));
+                                                    // Звертаємось до BuzzerSystem напряму, без window.
+                                                    if (typeof BuzzerSystem !== 'undefined' && BuzzerSystem.ws && BuzzerSystem.ws.readyState === WebSocket.OPEN) {
+                                                        BuzzerSystem.ws.send(JSON.stringify(payload));
                                                     } else {
-                                                        console.error("Не знайдено підключення WebSocket");
+                                                        console.error("Не знайдено підключення WebSocket або воно ще не відкрите");
+                                                        if (typeof showNotification === 'function') {
+                                                            showNotification("Немає зв'язку з сервером системи кнопок!", "error");
+                                                        }
                                                     }
                                                 }
                                             </script>
@@ -1176,7 +1177,7 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
 
     <!-- Модальне вікно для швидкого додавання питання -->
     <div class="modal fade" id="quickAddModal" tabindex="-1">
