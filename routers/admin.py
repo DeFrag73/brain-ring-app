@@ -139,12 +139,16 @@ async def admin_panel(
             'color_class': DifficultyLevel.get_color_class(difficulty)
         }
 
-    return templates.TemplateResponse("admin.html", {
-        "request": request, "questions": questions, "teams": teams,
-        "current_game": current_game, "team_stats": team_stats,
-        "difficulty_stats": difficulty_stats,
-        "difficulty_levels": [(level.value, DifficultyLevel.get_display_name(level)) for level in DifficultyLevel],
-        "current_sort": {"by": sort_by, "order": sort_order},
-        "bracket_rounds": bracket_rounds, "round_names": round_names,
-        "total_bracket_rounds": total_bracket_rounds
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={
+            "questions": questions, "teams": teams,
+            "current_game": current_game, "team_stats": team_stats,
+            "difficulty_stats": difficulty_stats,
+            "difficulty_levels": [(level.value, DifficultyLevel.get_display_name(level)) for level in DifficultyLevel],
+            "current_sort": {"by": sort_by, "order": sort_order},
+            "bracket_rounds": bracket_rounds, "round_names": round_names,
+            "total_bracket_rounds": total_bracket_rounds
+        }
+    )

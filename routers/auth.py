@@ -10,7 +10,7 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(name="login.html", request=request)
 
 
 @router.post("/login")
@@ -21,8 +21,9 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
     if not (correct_username and correct_password):
         return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Невірний логін або пароль"}
+            name="login.html",
+            request=request,
+            context={"error": "Невірний логін або пароль"},
         )
 
     # Якщо все ок, генеруємо токен

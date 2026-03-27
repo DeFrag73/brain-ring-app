@@ -426,7 +426,8 @@
                                                         <!-- Показати питання -->
                                                         <form method="post" action="/admin/game/show-question/{{ question.id }}" style="display: inline;">
                                                             <button type="submit" class="btn btn-info"
-                                                                    title="Показати на екрані">
+                                                                    title="Показати на екрані"
+                                                                    onclick="localStorage.setItem('activeSection', 'game');">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
                                                         </form>
@@ -773,20 +774,51 @@
                                     </form>
                                     <div class="row mt-4 border-top pt-3" id="buzzer-system-panel">
                                         <div class="col-12 text-center">
-                                            <h5 class="mb-3"><i class="fas fa-stopwatch"></i> Ігрова система (Кнопки)</h5>
+                                            <h5 class="mb-3"><i class="fas fa-stopwatch"></i> Ігрова система та Освітлення</h5>
+
+                                            <script>
+                                                function sendAdvancedBuzzerEvent(action, team = null) {
+                                                    const payload = { action: action };
+                                                    if (team) payload.team = team;
+
+                                                    // Використовуємо об'єкт BuzzerSystem з вашого script.js
+                                                    if (window.BuzzerSystem && window.BuzzerSystem.socket) {
+                                                        window.BuzzerSystem.socket.send(JSON.stringify(payload));
+                                                    } else if (window.BuzzerSystem && window.BuzzerSystem.ws) {
+                                                        window.BuzzerSystem.ws.send(JSON.stringify(payload));
+                                                    } else {
+                                                        console.error("Не знайдено підключення WebSocket");
+                                                    }
+                                                }
+                                            </script>
+
                                             <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded shadow-sm">
+
                                                 <div id="buzzer-team1" class="p-3 border rounded text-center bg-white" style="width: 30%;">
                                                     <h6 class="mb-0 text-truncate">{{ current_game.team1.name }}</h6>
                                                     <small class="text-muted">Клавіша '1'</small>
-                                                    <div class="buzzer-status h5 mt-2 mb-0 text-secondary">Очікування</div>
+                                                    <div class="buzzer-status h5 mt-2 mb-2 text-secondary">Очікування</div>
+                                                    <button class="btn btn-sm btn-outline-danger w-100" onclick="sendAdvancedBuzzerEvent('false_start', 'team1')" title="Блимати червоним">
+                                                        <i class="fas fa-exclamation-triangle"></i> Фальстарт
+                                                    </button>
                                                 </div>
 
                                                 <div class="text-center" style="width: 35%;">
-                                                    <button id="btn-start-time" class="btn btn-primary btn-lg w-100 shadow" onclick="BuzzerSystem.sendAction('start')">
+                                                    <button id="btn-start-time" class="btn btn-primary btn-lg w-100 shadow mb-2" onclick="BuzzerSystem.sendAction('start')">
                                                         <i class="fas fa-play"></i> ЧАС (Пробіл)
                                                     </button>
-                                                    <div class="mt-3">
-                                                        <button class="btn btn-sm btn-outline-secondary" onclick="BuzzerSystem.sendAction('reset')">
+
+                                                    <div class="btn-group w-100 mb-2" role="group">
+                                                        <button class="btn btn-success" onclick="sendAdvancedBuzzerEvent('correct')" title="Лампи блимають зеленим">
+                                                            <i class="fas fa-check"></i> Правильно
+                                                        </button>
+                                                        <button class="btn btn-danger" onclick="sendAdvancedBuzzerEvent('incorrect')" title="Лампи блимають червоним">
+                                                            <i class="fas fa-times"></i> Помилка
+                                                        </button>
+                                                    </div>
+
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-secondary w-100" onclick="BuzzerSystem.sendAction('reset')">
                                                             <i class="fas fa-undo"></i> Скинути (Esc)
                                                         </button>
                                                     </div>
@@ -795,8 +827,12 @@
                                                 <div id="buzzer-team2" class="p-3 border rounded text-center bg-white" style="width: 30%;">
                                                     <h6 class="mb-0 text-truncate">{{ current_game.team2.name }}</h6>
                                                     <small class="text-muted">Клавіша '2'</small>
-                                                    <div class="buzzer-status h5 mt-2 mb-0 text-secondary">Очікування</div>
+                                                    <div class="buzzer-status h5 mt-2 mb-2 text-secondary">Очікування</div>
+                                                    <button class="btn btn-sm btn-outline-danger w-100" onclick="sendAdvancedBuzzerEvent('false_start', 'team2')" title="Блимати червоним">
+                                                        <i class="fas fa-exclamation-triangle"></i> Фальстарт
+                                                    </button>
                                                 </div>
+
                                             </div>
                                         </div>
                                     </div>

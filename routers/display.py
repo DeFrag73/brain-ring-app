@@ -41,13 +41,16 @@ async def display_screen(request: Request, db: Session = Depends(get_db)):
                 models.Question.id == current_game.current_question_id
             ).first()
 
-    return templates.TemplateResponse("display.html", {
-        "request": request,
-        "current_game": current_game,
-        "team1": team1,
-        "team2": team2,
-        "current_question": current_question
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="display.html",
+        context={
+            "current_game": current_game,
+            "team1": team1,
+            "team2": team2,
+            "current_question": current_question
+        }
+    )
 
 
 @router.get("/api/display-data")

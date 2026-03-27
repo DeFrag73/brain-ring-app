@@ -1,18 +1,31 @@
-from fastapi import FastAPI, Request # Додай Request
+from dotenv import load_dotenv
+load_dotenv()
+
+from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
-from services.auth import RequiresLoginException # Імпортуємо наш виняток
+from services.auth import RequiresLoginException
 
 import models
 import database
-# Додай auth до імпорту роутерів
 from routers import admin, questions, teams, game, display, tournament, auth, buzzer
+from services.lighting import light_manager
 
-app = FastAPI(title="Брейн-ринг", description="Додаток для проведення ігор Брейн-ринг")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    connected = await light_manager.connect()
+    if not connected:
+        raise RuntimeError("Сервер не запущено: не вдалося підтвердити підключення до ламп Tapo")
+    yield
+    # Виконується при зупинці (можна вимкнути лампи, якщо треба)
+
+
+app = FastAPI(title="Брейн-ринг", description="Додаток для проведення ігор Брейн-ринг", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Обробник винятку: якщо немає токена, кидаємо на /login
 @app.exception_handler(RequiresLoginException)
 async def requires_login_exception_handler(request: Request, exc: RequiresLoginException):
     return RedirectResponse(url="/login")

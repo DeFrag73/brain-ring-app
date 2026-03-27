@@ -244,6 +244,17 @@ function handleKeyboardShortcuts(e) {
     if (e.key === 'Escape' && editModal) {
         editModal.hide();
     }
+
+    // НОВЕ: Alt+H (або 'р' в укр. розкладці) для приховування питання
+    if (e.altKey && (e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'р')) {
+        e.preventDefault();
+        const hideForm = document.querySelector('form[action="/admin/game/hide-question"]');
+        if (hideForm) {
+            hideForm.submit(); // Відправляємо форму, якщо вона є на сторінці
+        } else {
+            showNotification('Немає активного питання для приховування', 'warning');
+        }
+    }
 }
 
 // Оновлення поточної секції
@@ -1019,6 +1030,7 @@ const AdminPanel = {
                                 <li><kbd>Ctrl+2</kbd> - Команди</li>
                                 <li><kbd>Ctrl+3</kbd> - Поточна гра</li>
                                 <li><kbd>Ctrl+4</kbd> - Статистика</li>
+                                <li><kbd>Alt+H</kbd> - Сховати поточне питання</li>
                                 <li><kbd>F1</kbd> - Ця довідка</li>
                                 <li><kbd>F5</kbd> - Оновити дані</li>
                                 <li><kbd>Escape</kbd> - Закрити модальні вікна</li>

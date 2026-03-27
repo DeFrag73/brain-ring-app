@@ -2,9 +2,10 @@
 /.venv
 /requirements.txt
 __pycache__/
+**/__pycache__/
 *.pyc
-*.cpython-314.pyc
 *.pyo
+*.pyd
 
 /brainring.db
 /backup_sqllite.ps1
