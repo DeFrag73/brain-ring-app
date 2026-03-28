@@ -234,8 +234,8 @@ function handleKeyboardShortcuts(e) {
         }
     }
 
-    // F5 для оновлення даних без перезавантаження
-    if (e.key === 'F5' && e.ctrlKey) {
+    // Ctrl/Cmd + F5 для оновлення даних без перезавантаження
+    if (e.key === 'F5' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         refreshCurrentSection();
     }
@@ -245,12 +245,12 @@ function handleKeyboardShortcuts(e) {
         editModal.hide();
     }
 
-    // НОВЕ: Alt+H (або 'р' в укр. розкладці) для приховування питання
+    // Alt/Option + H для приховування питання
     if (e.altKey && (e.key.toLowerCase() === 'h' || e.key.toLowerCase() === 'р')) {
         e.preventDefault();
         const hideForm = document.querySelector('form[action="/admin/game/hide-question"]');
         if (hideForm) {
-            hideForm.submit(); // Відправляємо форму, якщо вона є на сторінці
+            hideForm.submit();
         } else {
             showNotification('Немає активного питання для приховування', 'warning');
         }
@@ -1016,6 +1016,10 @@ const AdminPanel = {
 
     // Показати довідку
     showKeyboardHelp: function() {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+        const modKey = isMac ? '⌘ Cmd' : 'Ctrl';
+        const altKey = isMac ? '⌥ Option' : 'Alt';
+
         const helpModal = `
             <div class="modal fade" id="helpModal" tabindex="-1">
                 <div class="modal-dialog">
@@ -1026,13 +1030,13 @@ const AdminPanel = {
                         </div>
                         <div class="modal-body">
                             <ul>
-                                <li><kbd>Ctrl+1</kbd> - Питання</li>
-                                <li><kbd>Ctrl+2</kbd> - Команди</li>
-                                <li><kbd>Ctrl+3</kbd> - Поточна гра</li>
-                                <li><kbd>Ctrl+4</kbd> - Статистика</li>
-                                <li><kbd>Alt+H</kbd> - Сховати поточне питання</li>
+                                <li><kbd>${modKey}+1</kbd> - Питання</li>
+                                <li><kbd>${modKey}+2</kbd> - Команди</li>
+                                <li><kbd>${modKey}+3</kbd> - Поточна гра</li>
+                                <li><kbd>${modKey}+4</kbd> - Статистика</li>
+                                <li><kbd>${altKey}+H</kbd> - Сховати поточне питання</li>
                                 <li><kbd>F1</kbd> - Ця довідка</li>
-                                <li><kbd>F5</kbd> - Оновити дані</li>
+                                <li><kbd>${modKey}+F5</kbd> - Оновити дані</li>
                                 <li><kbd>Escape</kbd> - Закрити модальні вікна</li>
                             </ul>
                         </div>
@@ -1040,8 +1044,16 @@ const AdminPanel = {
                 </div>
             </div>
         `;
+        // Видалити попередній модал, якщо існує
+        const existing = document.getElementById('helpModal');
+        if (existing) existing.remove();
+
         document.body.insertAdjacentHTML('beforeend', helpModal);
         new bootstrap.Modal(document.getElementById('helpModal')).show();
+
+        document.getElementById('helpModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+        });
     },
 
     // Ініціалізація теми
@@ -1213,7 +1225,7 @@ const BuzzerSystem = {
         team1: '1',
         team2: '2',
         start: ' ',
-        reset: 'escape'
+        reset: 'q'
     },
 
     init: function() {

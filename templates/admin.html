@@ -777,9 +777,22 @@
                                             <h5 class="mb-3"><i class="fas fa-stopwatch"></i> Ігрова система та Освітлення</h5>
 
                                             <script>
+                                                // Створюємо об'єкти Audio для звуків
+                                                const correctSound = new Audio('/static/sounds/correct.mp3');
+                                                const incorrectSound = new Audio('/static/sounds/incorrect.mp3');
+
                                                 function sendAdvancedBuzzerEvent(action, team = null) {
                                                     const payload = { action: action };
                                                     if (team) payload.team = team;
+
+                                                    // Відтворюємо відповідний звук
+                                                    if (action === 'correct') {
+                                                        correctSound.currentTime = 0; // Перемотка на початок
+                                                        correctSound.play();
+                                                    } else if (action === 'incorrect') {
+                                                        incorrectSound.currentTime = 0;
+                                                        incorrectSound.play();
+                                                    }
 
                                                     // Звертаємось до BuzzerSystem напряму, без window.
                                                     if (typeof BuzzerSystem !== 'undefined' && BuzzerSystem.ws && BuzzerSystem.ws.readyState === WebSocket.OPEN) {
