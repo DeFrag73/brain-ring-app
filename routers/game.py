@@ -121,3 +121,22 @@ async def finish_round(
         await broadcast_display_update(db)
 
     return admin_redirect("game")
+
+@router.post("/admin/game/cancel-round")
+async def cancel_round(
+        admin: str = Depends(get_current_admin),
+        db: Session = Depends(get_db)
+):
+    current_game = db.query(models.CurrentGame).first()
+    if current_game:
+        # Очищаємо поточний раунд БЕЗ створення запису GameResult
+        current_game.team1_id = None
+        current_game.team2_id = None
+        current_game.team1_score = 0
+        current_game.team2_score = 0
+        current_game.current_question_id = None
+        current_game.show_question = False
+        db.commit()
+        await broadcast_display_update(db)
+
+    return admin_redirect("game")

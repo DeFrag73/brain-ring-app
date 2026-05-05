@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Брейн-ринг - Адміністратор</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/all.min.css" rel="stylesheet">
     <link href="/static/style.css" rel="stylesheet">
 </head>
 <body>
@@ -43,9 +43,12 @@
                     </ul>
 
                     <hr class="text-white">
-                    <div class="text-center">
-                        <a href="/display" target="_blank" class="btn btn-success btn-sm">
+                    <div class="text-center mb-3">
+                        <a href="/display" target="_blank" class="btn btn-success btn-sm w-75 mb-2">
                             <i class="fas fa-tv"></i> Екран глядачів
+                        </a>
+                        <a href="/logout" class="btn btn-outline-danger btn-sm w-75">
+                            <i class="fas fa-sign-out-alt"></i> Вийти
                         </a>
                     </div>
                 </div>
@@ -423,7 +426,8 @@
                                                         <!-- Показати питання -->
                                                         <form method="post" action="/admin/game/show-question/{{ question.id }}" style="display: inline;">
                                                             <button type="submit" class="btn btn-info"
-                                                                    title="Показати на екрані">
+                                                                    title="Показати на екрані"
+                                                                    onclick="localStorage.setItem('activeSection', 'game');">
                                                                 <i class="fas fa-eye"></i>
                                                             </button>
                                                         </form>
@@ -661,6 +665,34 @@
                         </div>
                     </div>
 
+                    {% if current_game and current_game.current_question %}
+                    <div class="card mb-4 border-primary shadow-sm">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-comment-dots"></i> Поточне питання</h5>
+                            <span class="badge bg-light text-dark">
+                                Складність: {{ current_game.current_question.difficulty_display | default(current_game.current_question.difficulty.value) }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-title" style="line-height: 1.5; font-weight: normal;">
+                                {{ current_game.current_question.text }}
+                            </h3>
+
+                            {% if current_game.current_question.notes %}
+                            <hr>
+                            <p class="text-muted mb-0 fs-5">
+                                <i class="fas fa-check-circle text-success"></i> <strong>Відповідь / Нотатки:</strong>
+                                {{ current_game.current_question.notes }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info shadow-sm mb-4 border-start border-info border-4" role="alert">
+                        <i class="fas fa-info-circle fa-lg me-2"></i> <strong>Питання не обрано.</strong> Перейдіть у вкладку "Питання" та натисніть синю кнопку <button class="btn btn-info btn-sm mx-1 px-2 py-0" disabled><i class="fas fa-eye text-white"></i></button> біля потрібного питання, щоб воно з'явилося тут для зачитування.
+                    </div>
+                    {% endif %}
+
                     <!-- Поточний раунд -->
                     {% if current_game and current_game.team1_id and current_game.team2_id %}
                     <div class="card mb-4">
@@ -734,12 +766,99 @@
 
                             <div class="row mt-4">
                                 <div class="col-12 text-center">
-                                    <form method="post" action="/admin/game/finish-round"
-                                          onsubmit="return confirm('Завершити поточний раунд і записати результат?')">
-                                        <button type="submit" class="btn btn-warning">
-                                            <i class="fas fa-flag-checkered"></i> Завершити раунд
-                                        </button>
-                                    </form>
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <form method="post" action="/admin/game/finish-round"
+                                              onsubmit="return confirm('Завершити поточний раунд і записати результат?')">
+                                            <button type="submit" class="btn btn-warning">
+                                                <i class="fas fa-flag-checkered"></i> Завершити раунд
+                                            </button>
+                                        </form>
+
+                                        <form method="post" action="/admin/game/cancel-round"
+                                              onsubmit="return confirm('Ви впевнені, що хочете скасувати гру? Рахунок буде скинуто, а результат НЕ запишеться в статистику.')">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-times-circle"></i> Скасувати гру
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="row mt-4 border-top pt-3" id="buzzer-system-panel">
+                                        <div class="col-12 text-center">
+                                            <h5 class="mb-3"><i class="fas fa-stopwatch"></i> Ігрова система та Освітлення</h5>
+
+                                            <script>
+                                                // Створюємо об'єкти Audio для звуків
+                                                const correctSound = new Audio('/static/sounds/correct.mp3');
+                                                const incorrectSound = new Audio('/static/sounds/incorrect.mp3');
+
+                                                function sendAdvancedBuzzerEvent(action, team = null) {
+                                                    const payload = { action: action };
+                                                    if (team) payload.team = team;
+
+                                                    // Відтворюємо відповідний звук
+                                                    if (action === 'correct') {
+                                                        correctSound.currentTime = 0; // Перемотка на початок
+                                                        correctSound.play();
+                                                    } else if (action === 'incorrect') {
+                                                        incorrectSound.currentTime = 0;
+                                                        incorrectSound.play();
+                                                    }
+
+                                                    // Звертаємось до BuzzerSystem напряму, без window.
+                                                    if (typeof BuzzerSystem !== 'undefined' && BuzzerSystem.ws && BuzzerSystem.ws.readyState === WebSocket.OPEN) {
+                                                        BuzzerSystem.ws.send(JSON.stringify(payload));
+                                                    } else {
+                                                        console.error("Не знайдено підключення WebSocket або воно ще не відкрите");
+                                                        if (typeof showNotification === 'function') {
+                                                            showNotification("Немає зв'язку з сервером системи кнопок!", "error");
+                                                        }
+                                                    }
+                                                }
+                                            </script>
+
+                                            <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded shadow-sm">
+
+                                                <div id="buzzer-team1" class="p-3 border rounded text-center bg-white" style="width: 30%;">
+                                                    <h6 class="mb-0 text-truncate">{{ current_game.team1.name }}</h6>
+                                                    <small class="text-muted">Клавіша '1'</small>
+                                                    <div class="buzzer-status h5 mt-2 mb-2 text-secondary">Очікування</div>
+                                                    <button class="btn btn-sm btn-outline-danger w-100" onclick="sendAdvancedBuzzerEvent('false_start', 'team1')" title="Блимати червоним">
+                                                        <i class="fas fa-exclamation-triangle"></i> Фальстарт
+                                                    </button>
+                                                </div>
+
+                                                <div class="text-center" style="width: 35%;">
+                                                    <button id="btn-start-time" class="btn btn-primary btn-lg w-100 shadow mb-2" onclick="BuzzerSystem.sendAction('start')">
+                                                        <i class="fas fa-play"></i> ЧАС (Пробіл)
+                                                    </button>
+
+                                                    <div class="btn-group w-100 mb-2" role="group">
+                                                        <button class="btn btn-success" onclick="sendAdvancedBuzzerEvent('correct')" title="Лампи блимають зеленим">
+                                                            <i class="fas fa-check"></i> Правильно
+                                                        </button>
+                                                        <button class="btn btn-danger" onclick="sendAdvancedBuzzerEvent('incorrect')" title="Лампи блимають червоним">
+                                                            <i class="fas fa-times"></i> Помилка
+                                                        </button>
+                                                    </div>
+
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-secondary w-100" onclick="BuzzerSystem.sendAction('reset')">
+                                                            <i class="fas fa-undo"></i> Скинути (Esc)
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div id="buzzer-team2" class="p-3 border rounded text-center bg-white" style="width: 30%;">
+                                                    <h6 class="mb-0 text-truncate">{{ current_game.team2.name }}</h6>
+                                                    <small class="text-muted">Клавіша '2'</small>
+                                                    <div class="buzzer-status h5 mt-2 mb-2 text-secondary">Очікування</div>
+                                                    <button class="btn btn-sm btn-outline-danger w-100" onclick="sendAdvancedBuzzerEvent('false_start', 'team2')" title="Блимати червоним">
+                                                        <i class="fas fa-exclamation-triangle"></i> Фальстарт
+                                                    </button>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1080,7 +1199,7 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
 
     <!-- Модальне вікно для швидкого додавання питання -->
     <div class="modal fade" id="quickAddModal" tabindex="-1">
