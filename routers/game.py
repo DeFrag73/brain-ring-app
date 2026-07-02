@@ -46,7 +46,7 @@ async def show_question(
         current_game.show_question = True
         db.commit()
         await broadcast_display_update(db)
-    return admin_redirect("questions")
+    return admin_redirect("game") 
 
 
 @router.post("/admin/game/hide-question")
@@ -59,7 +59,7 @@ async def hide_question(
         current_game.show_question = False
         db.commit()
         await broadcast_display_update(db)
-    return admin_redirect("game")
+    return admin_redirect("questions")
 
 
 @router.post("/admin/game/add-score")

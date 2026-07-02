@@ -251,10 +251,10 @@ if __name__ == "__main__":
         load_dotenv()
 
         # Оновлюємо дані менеджера після завантаження .env
-        light_manager.email = os.getenv("TAPO_EMAIL", "")
-        light_manager.password = os.getenv("TAPO_PASSWORD", "")
-        light_manager.bulb1_ip = os.getenv("TAPO_BULB1_IP", "192.168.1.50")
-        light_manager.bulb2_ip = os.getenv("TAPO_BULB2_IP", "192.168.1.51")
+        light_manager.email = os.getenv("TAPO_EMAIL")
+        light_manager.password = os.getenv("TAPO_PASSWORD")
+        light_manager.bulb1_ip = os.getenv("TAPO_BULB1_IP")
+        light_manager.bulb2_ip = os.getenv("TAPO_BULB2_IP")
         # Оновлюємо клієнт з новими даними
         light_manager.client = ApiClient(light_manager.email, light_manager.password)
     except ImportError:
